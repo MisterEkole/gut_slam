@@ -1,30 +1,66 @@
 from mdh_nrsfm_socp import *
+from nrsfm_socp import *
+from mdhnrsfm import *
 
 
-# Generate synthetic data
-np.random.seed(42)
-M = 1  # Number of cameras
-N = 10  # Number of points
-K = 3  # Number of dimensions (e.g., 2D points)
+# import numpy as np
 
-# Generate random camera matrices
-m = [np.random.rand(K, N) for _ in range(M)]
+# # Number of images (camera views)
+# M = 2
 
-# Generate random visibility matrices
-vis = [np.random.randint(0, 2, size=N) for _ in range(M)]
+# # Number of 3D points
+# N = 4
 
-# Generate random depth indices with corrected parameters
-IDX = np.random.randint(0, N, size=(N, M + 1))
+# # Simulated camera projections (2D measurements)
+# m = []
+# for _ in range(M):
+#     m_i = np.random.rand(2, N) 
+#     m.append(m_i)
 
-# Set maximum depth heuristic
-max_depth_heuristic = 10.0
+# # Visibility matrix (for simplicity, all points visible in all images)
+# vis = [np.ones(N) for _ in range(M)]
 
-# Call MDH_NrSfM function
-mu_est, D_est = MDH_NrSfM(IDX, m, vis, max_depth_heuristic)
+# # Sample inter-point distance information (partially defined)
 
-# Print results
-print("Estimated Depth Matrix:")
-print(mu_est)
+# IDX = np.array([[0, 1], [1, 2]])
+# # Arbitrary maximum depth heuristic
+# max_depth_heuristic = 2.0
 
-print("\nEstimated Distance Matrix:")
-print(D_est)
+# # Sample execution using defined data
+# mu, D = MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS')  
+# #mu, D= NrSfM(IDX, m, vis, solver='MOSEK')
+
+# # Display reconstructed depths and calculated distances
+# print("Estimated Depths (mu):\n", mu)
+# print("Calculated Distances (D):\n", D)
+
+import numpy as np
+
+def generate_synthetic_data(M, N):
+    # Generate synthetic data (replace this with your actual data)
+    m = [np.random.rand(2, N) for _ in range(M)]
+    vis = [np.random.choice([True, False], size=N) for _ in range(M)]
+
+    # Generate synthetic neighborhood matrix (replace this with your actual data)
+    K = 5  # Number of neighbors
+    IDX = np.random.randint(0, N, size=(N, K + 1))
+
+    return IDX, m, vis
+
+def main():
+    # Generate synthetic data
+    M = 3  # Number of views
+    N = 100  # Number of tracked points
+    IDX, m, vis = generate_synthetic_data(M, N)
+
+    # Call NrSfM function
+    mu, D = NrSfM(IDX, m, vis)
+
+    # Display the results
+    print("Depth matrix (mu):")
+    print(mu)
+    print("\nMaximum distance matrix (D):")
+    print(D)
+
+if __name__ == "__main__":
+    main()
