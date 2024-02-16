@@ -7,7 +7,7 @@ import cvxpy as cp
 import numpy as np
 from scipy.sparse import csc_matrix, csr_matrix
 
-def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='MOSEK'):
+def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS'):
     M = len(m)
     N = m[0].shape[1]
 
