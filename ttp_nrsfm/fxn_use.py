@@ -13,16 +13,16 @@ from ttp_nrsfm.utils import *
 
 '''Example usage: reconstruct_cylindrical_mesh'''
 # # Example usage:
-# p = np.array([x, y, 1])  # Replace x and y with image coordinates
-# vp = np.array([vx, vy, vz])  # Replace vx, vy, vz with vanishing point coordinates
-# p_0 = np.array([p0x, p0y, p0z])  # Replace p0x, p0y, p0z with cylinder axis origin coordinates
-# R = cylinder_radius  # Replace cylinder_radius with the actual radius value
+p = np.array([3, 5, 1])  # Replace x and y with image coordinates
+vp = np.array([2, 3, 4])  # Replace vx, vy, vz with vanishing point coordinates
+p_0 = np.array([2, 3, 1])  # Replace p0x, p0y, p0z with cylinder axis origin coordinates
+R = 20  # Replace cylinder_radius with the actual radius value
 
-# result = reconstruct_cylindrical_mesh(p, vp, p_0, R)
-# print("P:", result[0])
-# print("Theta:", result[1])
-# print("h:", result[2])
-# print("u_d:", result[3])
+result = reconstruct_cylindrical_mesh(p, vp, p_0, R)
+print("P:", result[0])
+print("Theta:", result[1])
+print("h:", result[2])
+print("u_d:", result[3])
 
 '''Example usage: reconstruct_cylindrical_geometry'''
 

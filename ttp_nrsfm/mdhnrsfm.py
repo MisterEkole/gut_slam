@@ -63,7 +63,6 @@ def NrSfM(IDX, m, vis, solver='MOSEK'):
 
     A = np.concatenate([np.zeros((nconics * 4, 1)), A], axis=1)
     A = np.concatenate([np.array([[10] + [0] * (nparams2 - 1)]), A])
-
     x = cp.Variable(nparams2)
     constraints = [A @ x == 0]
 
