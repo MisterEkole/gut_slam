@@ -1,5 +1,5 @@
 from calib import get_calibration
-from utils import get_intensity, unproject_camera_model
+from utils import get_intensity, unprojec_cam_model
 from p_model import calib_p_model, cost_func, reg_func
 
 from tqdm import tqdm
@@ -17,7 +17,7 @@ import time
 # global k, g_t, gamma, regularization_lambda, alpha, img, depth_map, gradient, energy_function
 
 
-def compute_img_depths(img, iters=1000):
+def compute_img_depths(img, iters=5):
 
   img = 1/255 * img
   k, g_t, gamma = get_calibration(img)
@@ -38,7 +38,7 @@ def compute_img_depths(img, iters=1000):
       for col in range(img.shape[1]):
         d = depth_map[row, col]
         u = img[row, col] # pixel
-        x, y, z = unproject_camera_model(u, d) # angle to use in photometric model
+        x, y, z = unprojec_cam_model(u, d) # angle to use in photometric model
         L = calib_p_model(x, y, d, k, g_t, gamma) # TODO: Why is z never used??
         I = get_intensity(u)
         C = cost_func(I, L)
@@ -70,7 +70,7 @@ def compute_img_depths(img, iters=1000):
     # hessian = compute_hessian(energy_function)
     # trust_region_subproblem(energy_function, gradient, hessian)
     depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-    cv2.imwrite(f'../images/depthmap_{i}.png', depth_map_img)
+    cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png', depth_map_img)
 
   return depth_map
 
@@ -157,6 +157,6 @@ def compute_img_depths(img, iters=1000):
 
 
 if __name__=='__main__':
-  img = cv2.imread("...")
+  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg")
   print(f"CPU Count: {cpu_count()}")
   print(compute_img_depths(img))
