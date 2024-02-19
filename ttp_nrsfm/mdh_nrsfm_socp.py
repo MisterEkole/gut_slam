@@ -1,6 +1,9 @@
 '''
 MDH_NRSFML Maximum Depth Heuristic with Non-Rigid Structure from Motion under the inextensibility constraint.
 and the condition that each depth and each distance is non-negative.
+
+Author: Mitterand Ekole
+Date: 08-02-2024
 '''
 
 import cvxpy as cp
