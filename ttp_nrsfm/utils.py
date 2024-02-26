@@ -207,10 +207,12 @@ def create_cylindrical_mesh(nb_pts_radiaux, nb_pts_axiaux, rayon, hauteur):
     expspace = np.exp(lambda_val * np.linspace(np.log(zmin) / lambda_val, np.log(hauteur) / lambda_val, nb_pts_axiaux))
 
     theta, h = np.meshgrid(np.linspace(0, 2 * np.pi - delta_theta, nb_pts_radiaux), expspace)
-    nb_pts = np.prod(theta.shape)
+    
 
-    vec_theta = np.reshape(theta, nb_pts, 1)
-    vec_h = np.reshape(h, nb_pts, 1)
+    #vec_theta = np.reshape(theta, nb_pts, 1)
+    vec_theta=np.reshape(theta,(nb_pts_radiaux*nb_pts_axiaux,1))
+    vec_h=np.reshape(h,(nb_pts_radiaux*nb_pts_axiaux,1))
+    #vec_h = np.reshape(h, nb_pts, 1)
 
     nappe = rayon * np.ones_like(theta)
 
@@ -274,18 +276,31 @@ def create_I_model(pts2d, I_new, theta):
 def adjust_cylindrical_mesh(theta, h, nappe, K, vp, p_0, R):
     nb_pts = len(theta)
 
-    # beurk !
     global zmin
-    # fin beurk !
 
-    vec_theta = np.reshape(theta, (nb_pts, 1))
-    vec_h = np.reshape(h, (nb_pts, 1))
-    vec_nappe = np.reshape(nappe, (nb_pts, 1))
+   
 
-    P_0 = np.dot(np.linalg.inv(K), p_0) * np.ones((1, nb_pts))
+    vec_theta = np.reshape(theta, (theta.size,1))
+    vec_h = np.reshape(h, (h.size, 1))
+    vec_nappe = np.reshape(nappe, (nappe.size, 1))
+
+    #P_0 = np.dot(np.linalg.inv(K), p_0) * np.ones((1, nb_pts))
+    P_0 = np.dot(np.linalg.inv(K), p_0.reshape((3, 1))) * np.ones((1, nb_pts))
+
     u = np.dot(np.linalg.inv(K), vp)
     u /= np.linalg.norm(u)
-    u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))])
+    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))])
+    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))]).reshape((3, nb_pts))
+    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))]).squeeze()
+    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.concatenate([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))], axis=0)
+
+    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.concatenate([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))], axis=0).reshape((3, nb_pts))
+    u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.concatenate([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))], axis=0)
+
+
+
+
+
 
     u_d /= np.diag(np.sqrt(np.diag(u_d.T @ u_d)))
 
