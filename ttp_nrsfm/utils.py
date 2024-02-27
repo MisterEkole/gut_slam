@@ -276,35 +276,22 @@ def create_I_model(pts2d, I_new, theta):
 def adjust_cylindrical_mesh(theta, h, nappe, K, vp, p_0, R):
     nb_pts = len(theta)
 
+   
     global zmin
-
    
 
-    vec_theta = np.reshape(theta, (theta.size,1))
-    vec_h = np.reshape(h, (h.size, 1))
-    vec_nappe = np.reshape(nappe, (nappe.size, 1))
+    vec_theta = np.reshape(theta, (nb_pts, 1))
+    vec_h = np.reshape(h, (nb_pts, 1))
+    vec_nappe = np.reshape(nappe, (nb_pts, 1))
 
-    #P_0 = np.dot(np.linalg.inv(K), p_0) * np.ones((1, nb_pts))
-    P_0 = np.dot(np.linalg.inv(K), p_0.reshape((3, 1))) * np.ones((1, nb_pts))
-
+    P_0 = np.dot(np.linalg.inv(K), p_0) * np.ones((1, nb_pts))
     u = np.dot(np.linalg.inv(K), vp)
-    u /= np.linalg.norm(u)
-    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))])
-    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))]).reshape((3, nb_pts))
-    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))]).squeeze()
-    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.concatenate([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))], axis=0)
+    u = u / np.linalg.norm(u)
+    u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.vstack([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))])
 
-    #u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.concatenate([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))], axis=0).reshape((3, nb_pts))
-    u_d = (np.eye(3) - np.outer(u[:3], u[:3])) @ np.concatenate([np.cos(vec_theta), np.sin(vec_theta), np.zeros((1, nb_pts))], axis=0)
+    u_d = u_d / np.diag(np.sqrt(np.diag(u_d.T @ u_d)))
 
-
-
-
-
-
-    u_d /= np.diag(np.sqrt(np.diag(u_d.T @ u_d)))
-
-    pts3d = P_0 + R * u_d + np.outer(u, vec_h)
+    pts3d = P_0 + R * u_d + np.outer(u, vec_h.T)
 
     camTcyl = np.vstack([u_d[:, 0], np.cross(u[:3], u_d[:, 0]), u[:3], P_0[:, 0]])
     camTcyl = np.vstack([camTcyl, [0, 0, 0, 1]])
@@ -316,6 +303,7 @@ def adjust_cylindrical_mesh(theta, h, nappe, K, vp, p_0, R):
     pts2d = np.reshape(vec_pts2d, (3 * len(theta), len(theta)))
 
     return pts2d, pts3d, camTcyl
+
 
 
 
