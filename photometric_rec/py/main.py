@@ -16,63 +16,73 @@ from scipy.optimize import minimize
 # Globals for parallel processing
 # global k, g_t, gamma, regularization_lambda, alpha, img, depth_map, gradient, energy_function
 
+''' compute depth map using gradient descent'''
+def compute_img_depths(img, iters=500, downsample_factor=4):
+    img=cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
+    k, g_t, gamma = get_calibration(img)
+    energy_function = np.zeros((img.shape[0], img.shape[1]))
+    gradient = np.zeros((img.shape[0], img.shape[1]))
+    depth_map = np.zeros((img.shape[0], img.shape[1]))
+    errors = []
 
-def compute_img_depths(img, iters=500):
+    regularization_lambda = 1
+    alpha = 5
+    prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
-  img = 1/255 * img
-  k, g_t, gamma = get_calibration(img)
-  energy_function = np.zeros((img.shape[0], img.shape[1]))
-  gradient = np.zeros((img.shape[0], img.shape[1]))
-  # depth_map = np.sqrt(np.sum(img, axis=2))
-  depth_map = np.zeros((img.shape[0], img.shape[1]))
-  errors = []
+    for i in tqdm(range(iters)):
+        for row in range(img.shape[0]):
+            for col in range(img.shape[1]):
+                d = depth_map[row, col]
+                u = img[row, col]
+                x, y, z = unprojec_cam_model(u, d)
+                L = calib_p_model(x, y, d, k, g_t, gamma)
+                I = get_intensity(u)
+                C = cost_func(I, L)
+                R = reg_func(gradient[row, col])
+                energy_function[row, col] = C + regularization_lambda * R
 
-  # Minimize energy function
-  regularization_lambda = 0.5 # adjust
-  alpha = 5 # adjust learning rate
-  prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
-  prev_depth_map = np.zeros((img.shape[0], img.shape[1]))
-  for i in tqdm(range(iters)):
-    # Compute energy function for every pixel separately (as opposed to minimizing global energy function)
-    for row in tqdm(range(img.shape[0])):
-      for col in range(img.shape[1]):
-        d = depth_map[row, col]
-        u = img[row, col] # pixel
-        x, y, z = unprojec_cam_model(u, d) # angle to use in photometric model
-        L = calib_p_model(x, y, d, k, g_t, gamma) # TODO: Why is z never used??
-        I = get_intensity(u)
-        C = cost_func(I, L)
-        R = reg_func(gradient[row, col])
-        energy_function[row, col] = C + regularization_lambda * R
-        if row==200 and col==200:
-          print(C, R, x, y, d, u, z)
- 
-        # Perform gradient descent for every pixel
-        if i==0:
-          depth_map[row, col] += .1
-        else:
-          gradient[row, col] = energy_function[row, col] - prev_energy_function[row, col]
-          depth_dir = np.sign(depth_map[row, col] - prev_depth_map[row, col])
-          depth_map[row, col] -= depth_dir * alpha * gradient[row, col]
-        prev_energy_function[row, col] = energy_function[row, col]
-        prev_depth_map[row, col] = depth_map[row, col]
+                # Perform gradient descent for every pixel
+                if i > 0:
+                    gradient[row, col] = energy_function[row, col] - prev_energy_function[row, col]
+                    depth_map[row, col] -= alpha * gradient[row, col]
 
-  
-    error = np.sum(energy_function)
-    print(f"Error: {error}")
-    errors.append(error)
-    with open("./errors.txt", "w") as f:
-      for error in errors:
-        f.write(str(error) + "\n")
+        prev_energy_function = energy_function.copy()
 
-    
-    print(gradient[200][200])
+        error = np.sum(energy_function)
+        print(f"Iteration {i+1}, Error: {error}")
+        errors.append(error)
+
+        with open("./errors.txt", "w") as f:
+            for error in errors:
+                f.write(str(error) + "\n")
 
     depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
     cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png', depth_map_img)
 
-  return depth_map
+    display_point_cloud(depth_map, k, g_t, gamma)
 
+    return depth_map
+
+
+def display_point_cloud(depth_map,k,g_t,gamma):
+    point_cloud=generate_point_cloud(depth_map,k,g_t,gamma)
+    np.savetxt("point_cloud.txt",point_cloud)
+    print("Point cloud saved to point_cloud.txt")
+   
+def generate_point_cloud(depth_map,k,g_t,gamma):
+   point_cloud=[]
+   for row in range(depth_map.shape[0]):
+      for col in range (depth_map.shape[1]):
+         d=depth_map[row,col]
+         if d>0:
+            u,v=[row,col]
+            x=(u-k[0,2])*d/k[0,0]
+            y=(v-k[1,2])*d/k[1,1]
+            z=d
+
+            point_cloud.append([x,y,z])
+      return np.array(point_cloud)
+   
 
 
 def compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda):
@@ -94,8 +104,10 @@ def compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda):
 Optimize depth map using L-BFGS-B, trust-constr, or other optimization algorithms
 method: L-BFGS-B, trust-constr, etc.
 ''' 
-def optimize_depth_map(img, iters=500, regularization_lambda=0.5, alpha=0.1):
-    img = 1/255 * img
+
+''' Consumes more memory and is slower'''
+def optimize_depth_map(img, iters=500, regularization_lambda=0.5, alpha=0.1, downsample_factor=10):
+    img=cv2.resize(img,None,fx=1/downsample_factor,fy=1/downsample_factor,interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
     depth_map = np.zeros((img.shape[0], img.shape[1]))
 
@@ -121,8 +133,8 @@ def optimize_depth_map(img, iters=500, regularization_lambda=0.5, alpha=0.1):
         for error in erros:
           f.write(str(error)+"\n")
 
-        depth_map_img=cv2.normalize(src=optimize_depth_map,dst=None,alpha=0,beta=255,norm_type=cv2.NORM_MINMAX,dtype=cv2.CV_8UC1)
-        cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png',depth_map_img)
+    depth_map_img=cv2.normalize(src=optimize_depth_map,dst=None,alpha=0,beta=255,norm_type=cv2.NORM_MINMAX,dtype=cv2.CV_8UC1)
+    cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png',depth_map_img)
 
     return optimize_depth_map
 
@@ -175,7 +187,7 @@ def optimize_depth_map_parallel(img, iters=500, regularization_lambda=0.5, alpha
 
 if __name__=='__main__':
   img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg")
-  print(f"CPU Count: {cpu_count()}")
+  #print(f"CPU Count: {cpu_count()}")
   #print(optimize_depth_map(img))
-  print(optimize_depth_map_parallel(img))
-  #print(compute_img_depths(img))
+  #print(optimize_depth_map_parallel(img))
+  print(compute_img_depths(img))
