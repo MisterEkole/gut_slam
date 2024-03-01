@@ -9,7 +9,7 @@ import numpy as np
 M = 3
 
 # Number of 3D points
-N = 5000
+N = 300
 
 # Simulated camera projections (2D measurements)
 m = []
