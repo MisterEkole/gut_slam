@@ -16,9 +16,9 @@ from scipy.optimize import minimize
 # Globals for parallel processing
 # global k, g_t, gamma, regularization_lambda, alpha, img, depth_map, gradient, energy_function
 
-''' compute depth map using gradient descent'''
-def compute_img_depths(img, iters=500, downsample_factor=4):
-    img=cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
+''' compute depth map using gradient descent with variable step size'''
+def compute_img_depths(img, iters=500, downsample_factor=50):
+    img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
     energy_function = np.zeros((img.shape[0], img.shape[1]))
     gradient = np.zeros((img.shape[0], img.shape[1]))
@@ -26,7 +26,7 @@ def compute_img_depths(img, iters=500, downsample_factor=4):
     errors = []
 
     regularization_lambda = 1
-    alpha = 5
+    alpha = 0.001
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
     for i in tqdm(range(iters)):
@@ -41,10 +41,13 @@ def compute_img_depths(img, iters=500, downsample_factor=4):
                 R = reg_func(gradient[row, col])
                 energy_function[row, col] = C + regularization_lambda * R
 
-                # Perform gradient descent for every pixel
+                # Perform gradient descent for every pixel with variable step size
                 if i > 0:
                     gradient[row, col] = energy_function[row, col] - prev_energy_function[row, col]
-                    depth_map[row, col] -= alpha * gradient[row, col]
+
+                    # Introduce variable step size based on the gradient magnitude
+                    step_size = alpha / np.sqrt(np.sum(gradient[row, col] ** 2) + 1e-8)
+                    depth_map[row, col] -= step_size * gradient[row, col]
 
         prev_energy_function = energy_function.copy()
 
@@ -64,25 +67,25 @@ def compute_img_depths(img, iters=500, downsample_factor=4):
     return depth_map
 
 
+
 def display_point_cloud(depth_map,k,g_t,gamma):
     point_cloud=generate_point_cloud(depth_map,k,g_t,gamma)
     np.savetxt("point_cloud.txt",point_cloud)
     print("Point cloud saved to point_cloud.txt")
    
-def generate_point_cloud(depth_map,k,g_t,gamma):
-   point_cloud=[]
-   for row in range(depth_map.shape[0]):
-      for col in range (depth_map.shape[1]):
-         d=depth_map[row,col]
-         if d>0:
-            u,v=[row,col]
-            x=(u-k[0,2])*d/k[0,0]
-            y=(v-k[1,2])*d/k[1,1]
-            z=d
+def generate_point_cloud(depth_map, k, g_t, gamma):
+    point_cloud = []
+    for row in range(depth_map.shape[0]):
+        for col in range(depth_map.shape[1]):
+            d = depth_map[row, col]
+            if d > 0:
+                u, v = [row, col]
+                x = (u - k[0, 2]) * d / k[0, 0]
+                y = (v - k[1, 2]) * d / k[1, 1]
+                z = d
+                point_cloud.append([x, y, z])
+    return np.array(point_cloud)
 
-            point_cloud.append([x,y,z])
-      return np.array(point_cloud)
-   
 
 
 def compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda):
@@ -186,7 +189,7 @@ def optimize_depth_map_parallel(img, iters=500, regularization_lambda=0.5, alpha
     return optimized_depth_maps[-1]
 
 if __name__=='__main__':
-  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg")
+  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image4.jpg")
   #print(f"CPU Count: {cpu_count()}")
   #print(optimize_depth_map(img))
   #print(optimize_depth_map_parallel(img))

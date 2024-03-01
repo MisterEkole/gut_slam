@@ -8,7 +8,7 @@ Date: 08-02-2024
 
 import cvxpy as cp
 import numpy as np
-from scipy.sparse import csc_matrix, csr_matrix
+from scipy.sparse import csc_matrix, lil_matrix
 
 def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS'):
     M = len(m)
@@ -96,10 +96,10 @@ def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS'):
     C = np.zeros(nparams2)
     C[:nparams_mu2] = -1
 
-    A_eq = csc_matrix(np.concatenate([[np.zeros(nconics * 4)], A], axis=0))
-    A_eq = csc_matrix(np.concatenate([csc_matrix(np.zeros((1, nparams))), A], axis=0))
 
-    A_eq = csc_matrix(np.concatenate([[10, np.zeros(1), -np.ones(1)], A_eq], axis=0))
+    A_eq = csc_matrix(np.concatenate([np.zeros((1, nparams2)), A.toarray()], axis=0))
+    A_eq[0,0]=10 #set the first element of the first row to 10
+ 
 
     # Define positive depth and distance variables
     variables = cp.Variable(nparams2)
@@ -115,14 +115,19 @@ def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS'):
     model = cp.Problem(cp.Maximize(C @ variables), all_constraints)
     model.solve(solver='ECOS', verbose=True)
 
-    solu = np.array(variables.value)
+    #solu = np.array(variables.value)
+    #solu_reshaped=solu[:nparams_mu2].reshape((len(P),-1))
+   
+    #mu = np.zeros((M, N))
 
-    mu = np.zeros((M, N))
-    mu[P[:nparams_mu2]] = solu[:nparams_mu2]
-    mu = mu.T
+    #mu[P[:nparams_mu2]]=solu_reshaped.T
+    #mu = mu.T
 
-    D = solu[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
+    #D = solu[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
+    return variables.value[:nparams_mu2], variables.value[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
 
-    return mu, D
+
+    #return mu, D
+
 
 

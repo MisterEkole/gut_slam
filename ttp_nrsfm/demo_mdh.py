@@ -6,10 +6,10 @@ from mdhnrsfm import *
 import numpy as np
 
 # Number of images (camera views)
-M = 2
+M = 3
 
 # Number of 3D points
-N = 4
+N = 10000
 
 # Simulated camera projections (2D measurements)
 m = []
