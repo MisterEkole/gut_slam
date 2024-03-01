@@ -9,6 +9,24 @@ Date: 08-02-2024
 import cvxpy as cp
 import numpy as np
 from scipy.sparse import csc_matrix, lil_matrix
+import json
+
+def save_to_json(mu, D, file_path='output_data.json'):
+    # Convert numpy arrays to lists for JSON serialization
+    mu_list = mu.tolist()
+    D_list = D.tolist()
+
+    # Create a dictionary to store mu and D
+    data = {
+        'mu': mu_list,
+        'D': D_list
+    }
+
+    # Save data to JSON file
+    with open(file_path, 'w') as file:
+        json.dump(data, file)
+
+    print(f'Data saved to {file_path}')
 
 def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS'):
     M = len(m)
@@ -115,19 +133,20 @@ def MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS'):
     model = cp.Problem(cp.Maximize(C @ variables), all_constraints)
     model.solve(solver='ECOS', verbose=True)
 
-    #solu = np.array(variables.value)
-    #solu_reshaped=solu[:nparams_mu2].reshape((len(P),-1))
-   
-    #mu = np.zeros((M, N))
+    mu=variables.value[:nparams_mu2]
+    D=variables.value[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
 
-    #mu[P[:nparams_mu2]]=solu_reshaped.T
-    #mu = mu.T
-
-    #D = solu[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
-    return variables.value[:nparams_mu2], variables.value[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
-
-
-    #return mu, D
+    results={'mu':mu.tolist(),'D':D.tolist()}
+    with open('output_data.json','w') as file:
+        json.dump(results,file)
+    
+    ''' 
+        ~to be removed
+        #D = solu[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
+        #D=variables.value[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
+        #return variables.value[:nparams_mu2], variables.value[nparams_mu2:nparams2].reshape(IDX.shape[0], IDX.shape[1] - 1)
+    '''
+    return mu, D
 
 
 
