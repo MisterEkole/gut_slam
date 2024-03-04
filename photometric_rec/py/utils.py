@@ -38,6 +38,12 @@ def get_pixel_rgb(image_path, x, y):
 def get_cam_params():
     #return cx,cy,fx,fy and distortion coeff k1-4 for kanala brandt camera projection model
     return 735.37, 552.80, 717.21, 717.48, -0.13893, -1.2396e-3, 9.1258e-4, -4.0716e-5
+def get_intrinsic_matrix():
+    cx, cy, fx, fy, k1, k2, k3, k4 = get_cam_params()
+    K = np.array([[fx, 0, cx],
+                  [0, fy, cy],
+                  [0, 0, 1]])
+    return K
 
 def unprojec_cam_model(u,d):
     #kanalabrandt unprojection model

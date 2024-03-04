@@ -1,5 +1,5 @@
 from calib import get_calibration
-from utils import get_intensity, unprojec_cam_model
+from utils import get_intensity, unprojec_cam_model, get_intrinsic_matrix
 from p_model import calib_p_model, cost_func, reg_func
 
 from tqdm import tqdm
@@ -17,15 +17,16 @@ from scipy.optimize import minimize
 # global k, g_t, gamma, regularization_lambda, alpha, img, depth_map, gradient, energy_function
 
 ''' compute depth map using gradient descent with variable step size'''
-def compute_img_depths(img, iters=500, downsample_factor=50):
+def compute_img_depths(img, iters=1000, downsample_factor=5):
     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
+    print(k)
     energy_function = np.zeros((img.shape[0], img.shape[1]))
-    gradient = np.zeros((img.shape[0], img.shape[1]))
-    depth_map = np.zeros((img.shape[0], img.shape[1]))
+    gradient = np.ones((img.shape[0], img.shape[1]))
+    depth_map = (np.ones((img.shape[0], img.shape[1])))
     errors = []
 
-    regularization_lambda = 1
+    regularization_lambda = 1e-3
     alpha = 0.001
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
@@ -78,10 +79,11 @@ def generate_point_cloud(depth_map, k, g_t, gamma):
     for row in range(depth_map.shape[0]):
         for col in range(depth_map.shape[1]):
             d = depth_map[row, col]
+            K=get_intrinsic_matrix()
             if d > 0:
                 u, v = [row, col]
-                x = (u - k[0, 2]) * d / k[0, 0]
-                y = (v - k[1, 2]) * d / k[1, 1]
+                x = (u - K[0, 2]) * d / K[0, 0] #adjust to camera intrinsic
+                y = (v - K[1, 2]) * d / K[1, 1]
                 z = d
                 point_cloud.append([x, y, z])
     return np.array(point_cloud)
@@ -109,10 +111,10 @@ method: L-BFGS-B, trust-constr, etc.
 ''' 
 
 ''' Consumes more memory and is slower'''
-def optimize_depth_map(img, iters=500, regularization_lambda=0.5, alpha=0.1, downsample_factor=10):
+def optimize_depth_map(img, iters=50, regularization_lambda=0.5, alpha=0.1, downsample_factor=10):
     img=cv2.resize(img,None,fx=1/downsample_factor,fy=1/downsample_factor,interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
-    depth_map = np.zeros((img.shape[0], img.shape[1]))
+    depth_map = np.ones((img.shape[0], img.shape[1]))
 
     def objective(depth_map):
         return compute_energy_func(depth_map.reshape(img.shape[0], img.shape[1]), img, k, g_t, gamma, regularization_lambda)
@@ -189,7 +191,7 @@ def optimize_depth_map_parallel(img, iters=500, regularization_lambda=0.5, alpha
     return optimized_depth_maps[-1]
 
 if __name__=='__main__':
-  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image4.jpg")
+  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg")
   #print(f"CPU Count: {cpu_count()}")
   #print(optimize_depth_map(img))
   #print(optimize_depth_map_parallel(img))
