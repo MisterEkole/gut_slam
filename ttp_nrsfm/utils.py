@@ -22,6 +22,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from mpl_toolkits.mplot3d import Axes3D
 
 def getNeighborsVis(m, Ng, visb):
     N = m[0].shape[1]
@@ -70,6 +71,7 @@ def register_to_ground_truth(Q, Qg):
     Q[2, :] = Qz
 
     return Q, alpha, signo
+
 
 
 ''' Fxn to reconstruct a 3D point on a cylindrical mesh from its 2D image coordinates and the vanishing point.'''
@@ -156,7 +158,9 @@ def project_cylindrical_mesh(theta, h, nappe, K, camTcyl, zmin):
 
     nb_pts = len(theta)
 
-    vec_theta = np.reshape(theta, (nb_pts, 1))
+    #vec_theta = np.reshape(theta, (nb_pts, 1))
+    vec_theta = np.reshape(theta, (nb_theta, nb_h))
+
     vec_h = np.reshape(h, (nb_pts, 1))
     vec_nappe = np.reshape(nappe, (nb_pts, 1))
 
