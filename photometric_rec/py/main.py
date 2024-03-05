@@ -11,23 +11,27 @@ from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.managers import SharedMemoryManager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from scipy.optimize import minimize
 # Globals for parallel processing
 # global k, g_t, gamma, regularization_lambda, alpha, img, depth_map, gradient, energy_function
 
+
+
 ''' compute depth map using gradient descent with variable step size'''
-def compute_img_depths(img, iters=1000, downsample_factor=5):
+def compute_img_depths(img, iters=10, downsample_factor=5, display_interval=100):
     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
-    print(k)
+    
     energy_function = np.zeros((img.shape[0], img.shape[1]))
     gradient = np.ones((img.shape[0], img.shape[1]))
-    depth_map = (np.ones((img.shape[0], img.shape[1])))
+    depth_map = np.ones((img.shape[0], img.shape[1]))
     errors = []
 
-    regularization_lambda = 1e-3
-    alpha = 0.001
+    regularization_lambda = 1e-2
+    alpha = 0.05
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
     for i in tqdm(range(iters)):
@@ -57,16 +61,29 @@ def compute_img_depths(img, iters=1000, downsample_factor=5):
         errors.append(error)
 
         with open("./errors.txt", "w") as f:
-            for error in errors:
-                f.write(str(error) + "\n")
+            for e in errors:
+                f.write(str(e) + "\n")
 
-    depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-    cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png', depth_map_img)
-
-    display_point_cloud(depth_map, k, g_t, gamma)
+        if (i + 1) % display_interval == 0 or i == iters - 1:
+            display_depth_map(depth_map, i)
 
     return depth_map
 
+
+def display_depth_map(depth_map, iteration):
+    depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+    cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{iteration}.png', depth_map_img)
+
+    # Display depth map
+    plt.imshow(depth_map_img, cmap='gray')
+    plt.title(f'Depth Map - Iteration {iteration}')
+    plt.colorbar()
+    plt.show()
+
+    # Display heatmap variation of the depth map estimate
+    sns.heatmap(depth_map, cmap='viridis', annot=False)
+    plt.title(f'Depth Map Heatmap - Iteration {iteration}')
+    plt.show()
 
 
 def display_point_cloud(depth_map,k,g_t,gamma):
@@ -196,3 +213,4 @@ if __name__=='__main__':
   #print(optimize_depth_map(img))
   #print(optimize_depth_map_parallel(img))
   print(compute_img_depths(img))
+  
