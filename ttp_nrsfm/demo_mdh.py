@@ -27,7 +27,8 @@ IDX = np.array([[0, 1], [1, 2]])
 max_depth_heuristic = 2.0
 
 # Sample execution using defined data
-mu, D = MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS')  
+#mu, D = MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS')  
+mu, D= NrSfM(IDX, m, vis, solver='ECOS')
 
 
 # Display reconstructed depths and calculated distances
