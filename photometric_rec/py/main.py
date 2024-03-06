@@ -1,5 +1,5 @@
 from calib import get_calibration
-from utils import get_intensity, unprojec_cam_model, get_intrinsic_matrix
+from utils import get_intensity, unprojec_cam_model, get_intrinsic_matrix,get_canonical_intensity
 from p_model import calib_p_model, cost_func, reg_func
 
 from tqdm import tqdm
@@ -13,25 +13,38 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import time
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL import Image
 
-from scipy.optimize import minimize
+from scipy.optimize import minimize, least_squares
 # Globals for parallel processing
 # global k, g_t, gamma, regularization_lambda, alpha, img, depth_map, gradient, energy_function
 
+#generate synthetic image data
+def generate_synthetic_image(size=(512, 512), intensity_range=(0, 255)):
+    # Create a synthetic image with random intensity values
+    synthetic_image = np.random.randint(intensity_range[0], intensity_range[1] + 1, size, dtype=np.uint8)
+    return synthetic_image
+
+# read image data
+def get_synthetic_image_data():
+    synthetic_image = generate_synthetic_image()
+    return synthetic_image
 
 
 ''' compute depth map using gradient descent with variable step size'''
-def compute_img_depths(img, iters=10, downsample_factor=5, display_interval=100):
+def compute_img_depths(img, iters=500, downsample_factor=5, display_interval=100):
     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
     
     energy_function = np.zeros((img.shape[0], img.shape[1]))
     gradient = np.ones((img.shape[0], img.shape[1]))
     depth_map = np.ones((img.shape[0], img.shape[1]))
+    #depth_map=1/np.sqrt(np.cos(0)) #depth map init with canonical intensity
+    #depth_map=np.full((img.shape[0],img.shape[1]),np.cos(0))
     errors = []
 
-    regularization_lambda = 1e-2
-    alpha = 0.05
+    regularization_lambda = 1e-3
+    alpha = 0.001
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
     for i in tqdm(range(iters)):
@@ -56,8 +69,10 @@ def compute_img_depths(img, iters=10, downsample_factor=5, display_interval=100)
 
         prev_energy_function = energy_function.copy()
 
-        error = np.sum(energy_function)
-        print(f"Iteration {i+1}, Error: {error}")
+        #error = np.sum(energy_function)
+    
+        error=(np.sum(energy_function) / (img.shape[0] * img.shape[1]))*100 #expressed in percentage
+        print(f"Iteration {i+1}, Error: {error}%")
         errors.append(error)
 
         with open("./errors.txt", "w") as f:
@@ -122,43 +137,44 @@ def compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda):
             energy_func[row, col] = C + regularization_lambda * R
 
     return np.sum(energy_func)
-'''
-Optimize depth map using L-BFGS-B, trust-constr, or other optimization algorithms
-method: L-BFGS-B, trust-constr, etc.
-''' 
 
-''' Consumes more memory and is slower'''
-def optimize_depth_map(img, iters=50, regularization_lambda=0.5, alpha=0.1, downsample_factor=10):
-    img=cv2.resize(img,None,fx=1/downsample_factor,fy=1/downsample_factor,interpolation=cv2.INTER_AREA)
-    k, g_t, gamma = get_calibration(img)
-    depth_map = np.ones((img.shape[0], img.shape[1]))
 
-    def objective(depth_map):
-        return compute_energy_func(depth_map.reshape(img.shape[0], img.shape[1]), img, k, g_t, gamma, regularization_lambda)
+def objective_function(params, img, k, g_t, gamma, regularization_lambda):
+    depth_map = params.reshape(img.shape[:2])
+    return (compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda)**2).flatten()
 
-    bounds = [(0, np.inf)] * (img.shape[0] * img.shape[1])  # Non-negative depth values
 
-    # Initial guess for depth_map
-    initial_depth_map = np.zeros((img.shape[0], img.shape[1]))
 
-    #minimize with LFGBS-B
-    erros=[]
+def dogleg_optimization(img, k, g_t, gamma, iters=50, downsample_factor=10, display_interval=100):
+    img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
+
+    # Initial guess for the depth map
+    initial_depth_map = np.full((img.shape[0], img.shape[1]), np.cos(0))
+
+    # Flatten the depth map for optimization
+    initial_params = initial_depth_map.flatten()
+
+    # Additional parameters for the objective function
+    args = (img, k, g_t, gamma, 0.3)  # regularization_lambda set to 1.0,adjust as needed
+
+    result = least_squares(objective_function, initial_params, args=args, method='dogbox', max_nfev=iters)
+
+    optimized_depth_map = result.x.reshape(img.shape[:2])
+
     for i in tqdm(range(iters)):
-      result=minimize(objective,initial_depth_map.flatten(),method='L-BFGS-B',bounds=bounds,options={'maxiter':iters})
-      optimize_depth_map=result.x.reshape(img.shape[0],img.shape[1])
-      error=compute_energy_func(optimize_depth_map,img,k,g_t,gamma,regularization_lambda)
-      erros.append(error)
-      
-      print(f"iteation {i+1}/{iters} , Error:{error}")
+        # Additional processing if needed
+        # ...
 
-      with open("./errors.txt","w") as f:
-        for error in erros:
-          f.write(str(error)+"\n")
+        error = result.cost
+        print(f"Iteration {i+1}, Error: {error}")
 
-    depth_map_img=cv2.normalize(src=optimize_depth_map,dst=None,alpha=0,beta=255,norm_type=cv2.NORM_MINMAX,dtype=cv2.CV_8UC1)
-    cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png',depth_map_img)
+        with open("./errors_dogleg.txt", "w") as f:
+            f.write(str(error) + "\n")
 
-    return optimize_depth_map
+        if (i + 1) % display_interval == 0 or i == iters - 1:
+            display_depth_map(optimized_depth_map, i)
+
+    return optimized_depth_map   
 
 ''' Parallel processing of iterations '''
 # Function to optimize a single iteration
@@ -209,8 +225,10 @@ def optimize_depth_map_parallel(img, iters=500, regularization_lambda=0.5, alpha
 
 if __name__=='__main__':
   img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg")
+  #sythetic_img = get_synthetic_image_data()
+  #print(compute_img_depths(sythetic_img))
   #print(f"CPU Count: {cpu_count()}")
-  #print(optimize_depth_map(img))
-  #print(optimize_depth_map_parallel(img))
+  
   print(compute_img_depths(img))
+  #print(dogleg_optimization(img, k=2.5,g_t=2.0,gamma=2.2))
   
