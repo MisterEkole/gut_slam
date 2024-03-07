@@ -101,22 +101,6 @@ def display_depth_map(depth_map, iteration):
     plt.title(f'Depth Map Heatmap - Iteration {iteration}')
     plt.show()
 
-# def display_depth_map(depth_map, iteration):
-#     # Existing implementation for displaying the depth map
-#     depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-#     cv2.imwrite(f'depthmap_{iteration}.png', depth_map_img)
-
-#     # Save the heatmap image after an interval of 100 iterations
-#     if (iteration + 1) % 100 == 0 or iteration == iter - 1:
-#         plt.figure(figsize=(10, 8))
-#         sns.heatmap(depth_map, cmap='viridis', annot=False)
-#         plt.title(f'Depth Map Heatmap - Iteration {iteration}')
-#         plt.savefig(f'depthmap_heatmap_{iteration}.png')  # Save the heatmap image
-#         plt.close()
-#     else:
-#         plt.show()
-
-
 
 
 def save_depth_map_heatmap(depth_map, iteration):
