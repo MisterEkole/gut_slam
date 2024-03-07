@@ -31,6 +31,7 @@ def get_synthetic_image_data():
     return synthetic_image
 
 
+
 ''' compute depth map using gradient descent with variable step size'''
 def compute_img_depths(img, iters=50, downsample_factor=10, display_interval=100):
     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
@@ -113,7 +114,7 @@ def save_depth_map_heatmap(depth_map, iteration):
 
 def display_point_cloud(depth_map,k,g_t,gamma):
     point_cloud=generate_point_cloud(depth_map,k,g_t,gamma)
-    np.savetxt("/Users/ekole/Dev/gut_slam/photometric_rec/py/point_cloud1.txt",point_cloud)
+    np.savetxt("/Users/ekole/Dev/gut_slam/photometric_rec/py/point_cloud2.txt",point_cloud)
     print("Point cloud saved to point_cloud.txt")
    
 def generate_point_cloud(depth_map, k, g_t, gamma):
@@ -149,62 +150,10 @@ def compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda):
     return np.sum(energy_func)
 
 
-
-
-''' Parallel processing of iterations '''
-# Function to optimize a single iteration
-def optimize_iteration(args):
-    i, initial_depth_map, img, k, g_t, gamma, regularization_lambda = args
-    bounds = [(0, np.inf)] * (img.shape[0] * img.shape[1])  # Non-negative depth values
-    def objective(depth_map):
-        return compute_energy_func(depth_map.reshape(img.shape[0], img.shape[1]), img, k, g_t, gamma, regularization_lambda)
-
-    result = minimize(objective, initial_depth_map.flatten(), method='L-BFGS-B', bounds=bounds, options={'maxiter': 1})
-    optimized_depth_map = result.x.reshape(img.shape[0], img.shape[1])
-    error = compute_energy_func(optimized_depth_map, img, k, g_t, gamma, regularization_lambda)
-
-    print(f"Iteration {i+1}, Error: {error}")
-
-    with open("./errors.txt", "w") as f:
-        f.write(str(error) + "\n")
-    depth_map_img = cv2.normalize(src=optimized_depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-    cv2.imwrite(f'/Users/ekole/Dev/gut_slam/gut_images/depthmap_{i}.png', depth_map_img)
-
-    return optimized_depth_map, error
-
-def optimize_depth_map_parallel(img, iters=500, regularization_lambda=0.5, alpha=0.1, num_processes=4):
-    img = 1/255 * img
-    k, g_t, gamma = get_calibration(img)
-    depth_map = np.zeros((img.shape[0], img.shape[1]))
-
-    pool = Pool(processes=num_processes)
-
-    # Initial guess for depth_map
-    initial_depth_map = np.zeros((img.shape[0], img.shape[1]))
-
-    # Create argument list for parallel processing
-    args_list = [(i, initial_depth_map, img, k, g_t, gamma, regularization_lambda) for i in range(iters)]
-
-    # Parallel processing of iterations
-    results = pool.map(optimize_iteration, args_list)
-
-    # Close the pool to free up resources
-    pool.close()
-    pool.join()
-
-    optimized_depth_maps, errors = zip(*results)
-
-    # Save results or perform additional analysis if needed
-
-    return optimized_depth_maps[-1]
-
 if __name__=='__main__':
   img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image4.jpg")
-  #sythetic_img = get_synthetic_image_data()
-  #print(compute_img_depths(sythetic_img))
-  #print(f"CPU Count: {cpu_count()}")
-  
   print(compute_img_depths(img))
+ 
   
   
   

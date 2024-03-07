@@ -22,6 +22,7 @@ def calib_p_model(x,y,z,k,g_t,gamma):
     Returns:
         float: The calculated light intensity (or radiance) at the pixel.
     """
+    
     mu=light_spread_func(z,k)
     fr_theta=1/np.pi  #Lambertian BRDF
     cen_to_pix=np.linalg.norm(np.array([x,y,z])) #distance from the center of the image to the pixel
