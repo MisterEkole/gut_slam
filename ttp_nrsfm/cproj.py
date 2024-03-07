@@ -6,19 +6,30 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import cv2
 
 
+
+
+# def create_cylinder(radius, height, num_pixel_points=10):
+#     num_points=int(2*np.pi*radius*num_pixel_points)
+#     theta = np.linspace(0, 2 * np.pi, num_points) #gen array of angles, each angle is a point on circumference
+#     x = radius * np.cos(theta)
+#     y = radius * np.sin(theta)
+#     z = np.linspace(0, height, num_points)
+#     return np.column_stack((x, y, z))
+
+def create_cylinder(radius, height, num_pixel_points=5):  #exponential grid spacing
+    num_points = int(2 * np.pi * radius * num_pixel_points)
+    theta = np.linspace(0, 2 * np.pi, num_points)
+    x = radius * np.cos(theta)
+    y = radius * np.sin(theta)
+    lambda_val = 4
+    zmin = 0.01  # Replace with your desired minimum axial value
+    z = np.exp(lambda_val * np.linspace(np.log(zmin)/lambda_val, np.log(height)/lambda_val, num_points))
+    return np.column_stack((x, y, z))
+
 def update_cylinder_position(event):
     if event.inaxes == ax_2d:
         new_center = np.array([event.xdata, event.ydata])
         update_cylinder(new_center)
-
-def create_cylinder(radius, height, num_pixel_points=10):
-    num_points=int(2*np.pi*radius*num_pixel_points)
-    theta = np.linspace(0, 2 * np.pi, num_points)
-    x = radius * np.cos(theta)
-    y = radius * np.sin(theta)
-    z = np.linspace(0, height, num_points)
-    return np.column_stack((x, y, z))
-
 
 def update_cylinder(new_center):
     global cylinder_points, projected_points, mesh
@@ -29,13 +40,14 @@ def update_cylinder(new_center):
     projected_points = project_points_onto_image(cylinder_points)
     
     # Update the scatter plot for 2D projection
-    scatter_2d.set_offsets(projected_points)
+    #scatter_2d.set_offsets(projected_points)
+    scatter_2d.set_offsets(projected_points[:, :2])
     
     # Update the 3D plot for 3D projection
-    ax_3d.cla()  # Clear the previous 3D plot
+    #ax_3d.cla()  # Clear the previous 3D plot
     
     # Plot the cylinder as a mesh
-    mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='b', alpha=0.7)
+    mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='b', alpha=1)
     
     ax_3d.set_xlabel('X')
     ax_3d.set_ylabel('Y')
@@ -43,6 +55,10 @@ def update_cylinder(new_center):
     ax_3d.zaxis.set_rotate_label(False)
     ax_3d.set_zlabel('Z', rotation=90, labelpad=10)
     ax_3d.set_title('3D Projection of Cylinder')
+    # Set new limits for 3D plot based on updated cylinder points
+    ax_3d.set_xlim([np.min(cylinder_points[:, 0]), np.max(cylinder_points[:, 0])])
+    ax_3d.set_ylim([np.min(cylinder_points[:, 1]), np.max(cylinder_points[:, 1])])
+    ax_3d.set_zlim([np.min(cylinder_points[:, 2]), np.max(cylinder_points[:, 2])])
 
     plt.draw()
 
@@ -82,7 +98,7 @@ image_path = '/Users/ekole/Dev/gut_slam/gut_images/image3.jpeg'
 image = cv2.imread(image_path)
 image_resolution=(image.shape[1], image.shape[0])
 # Generate 3D points for a cylinder
-radius = 0.5
+radius = 5.0
 height = 1.0
 
 
@@ -105,7 +121,7 @@ ax_2d.legend()
 ax_3d = fig.add_subplot(122, projection='3d')
 
 # Plot the cylinder as a mesh
-mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='b', alpha=0.7)
+mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='r', alpha=0.7)
 
 ax_3d.set_xlabel('X')
 ax_3d.set_ylabel('Y')

@@ -32,18 +32,18 @@ def get_synthetic_image_data():
 
 
 ''' compute depth map using gradient descent with variable step size'''
-def compute_img_depths(img, iters=500, downsample_factor=5, display_interval=100):
+def compute_img_depths(img, iters=50, downsample_factor=10, display_interval=100):
     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
     
     energy_function = np.zeros((img.shape[0], img.shape[1]))
     gradient = np.ones((img.shape[0], img.shape[1]))
-    depth_map = np.ones((img.shape[0], img.shape[1]))
-    #depth_map=1/np.sqrt(np.cos(0)) #depth map init with canonical intensity
-    #depth_map=np.full((img.shape[0],img.shape[1]),np.cos(0))
+    #depth_map = np.ones((img.shape[0], img.shape[1]))
+    depth_map=1/np.sqrt(np.cos(0)) #depth map init with canonical intensity
+    depth_map=np.full((img.shape[0],img.shape[1]),np.cos(0))
     errors = []
 
-    regularization_lambda = 1e-3
+    regularization_lambda = 1.0
     alpha = 0.001
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
@@ -81,6 +81,7 @@ def compute_img_depths(img, iters=500, downsample_factor=5, display_interval=100
 
         if (i + 1) % display_interval == 0 or i == iters - 1:
             display_depth_map(depth_map, i)
+        display_point_cloud(depth_map,k,g_t,gamma)
 
     return depth_map
 
@@ -100,10 +101,35 @@ def display_depth_map(depth_map, iteration):
     plt.title(f'Depth Map Heatmap - Iteration {iteration}')
     plt.show()
 
+# def display_depth_map(depth_map, iteration):
+#     # Existing implementation for displaying the depth map
+#     depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+#     cv2.imwrite(f'depthmap_{iteration}.png', depth_map_img)
+
+#     # Save the heatmap image after an interval of 100 iterations
+#     if (iteration + 1) % 100 == 0 or iteration == iter - 1:
+#         plt.figure(figsize=(10, 8))
+#         sns.heatmap(depth_map, cmap='viridis', annot=False)
+#         plt.title(f'Depth Map Heatmap - Iteration {iteration}')
+#         plt.savefig(f'depthmap_heatmap_{iteration}.png')  # Save the heatmap image
+#         plt.close()
+#     else:
+#         plt.show()
+
+
+
+
+def save_depth_map_heatmap(depth_map, iteration):
+    # Save the heatmap image
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(depth_map, cmap='viridis', annot=False)
+    plt.title(f'Depth Map Heatmap - Iteration {iteration}')
+    plt.savefig(f'depthmap_heatmap_{iteration}.png')  # Save the heatmap image
+    plt.close()
 
 def display_point_cloud(depth_map,k,g_t,gamma):
     point_cloud=generate_point_cloud(depth_map,k,g_t,gamma)
-    np.savetxt("point_cloud.txt",point_cloud)
+    np.savetxt("/Users/ekole/Dev/gut_slam/photometric_rec/py/point_cloud1.txt",point_cloud)
     print("Point cloud saved to point_cloud.txt")
    
 def generate_point_cloud(depth_map, k, g_t, gamma):
@@ -139,42 +165,7 @@ def compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda):
     return np.sum(energy_func)
 
 
-def objective_function(params, img, k, g_t, gamma, regularization_lambda):
-    depth_map = params.reshape(img.shape[:2])
-    return (compute_energy_func(depth_map, img, k, g_t, gamma, regularization_lambda)**2).flatten()
 
-
-
-def dogleg_optimization(img, k, g_t, gamma, iters=50, downsample_factor=10, display_interval=100):
-    img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
-
-    # Initial guess for the depth map
-    initial_depth_map = np.full((img.shape[0], img.shape[1]), np.cos(0))
-
-    # Flatten the depth map for optimization
-    initial_params = initial_depth_map.flatten()
-
-    # Additional parameters for the objective function
-    args = (img, k, g_t, gamma, 0.3)  # regularization_lambda set to 1.0,adjust as needed
-
-    result = least_squares(objective_function, initial_params, args=args, method='dogbox', max_nfev=iters)
-
-    optimized_depth_map = result.x.reshape(img.shape[:2])
-
-    for i in tqdm(range(iters)):
-        # Additional processing if needed
-        # ...
-
-        error = result.cost
-        print(f"Iteration {i+1}, Error: {error}")
-
-        with open("./errors_dogleg.txt", "w") as f:
-            f.write(str(error) + "\n")
-
-        if (i + 1) % display_interval == 0 or i == iters - 1:
-            display_depth_map(optimized_depth_map, i)
-
-    return optimized_depth_map   
 
 ''' Parallel processing of iterations '''
 # Function to optimize a single iteration
@@ -224,11 +215,12 @@ def optimize_depth_map_parallel(img, iters=500, regularization_lambda=0.5, alpha
     return optimized_depth_maps[-1]
 
 if __name__=='__main__':
-  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg")
+  img = cv2.imread("/Users/ekole/Dev/gut_slam/gut_images/image4.jpg")
   #sythetic_img = get_synthetic_image_data()
   #print(compute_img_depths(sythetic_img))
   #print(f"CPU Count: {cpu_count()}")
   
   print(compute_img_depths(img))
-  #print(dogleg_optimization(img, k=2.5,g_t=2.0,gamma=2.2))
+  
+  
   
