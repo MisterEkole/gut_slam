@@ -1,8 +1,4 @@
 from mdh_nrsfm_socp import *
-from nrsfm_socp import *
-from mdhnrsfm import *
-
-
 import numpy as np
 
 # Number of images (camera views)
@@ -28,7 +24,8 @@ max_depth_heuristic = 2.0
 
 # Sample execution using defined data
 mu, D = MDH_NrSfM(IDX, m, vis, max_depth_heuristic, solver='ECOS')  
-#mu, D= NrSfM(IDX, m, vis, solver='MOSEK')
+
+
 
 # Display reconstructed depths and calculated distances
 print("Estimated Depths (mu):\n", mu)
