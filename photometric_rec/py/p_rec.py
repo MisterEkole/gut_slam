@@ -1,3 +1,4 @@
+''' Patch based reconstruction'''
 import argparse
 from calib import get_calibration
 from utils import get_intensity, unprojec_cam_model, get_intrinsic_matrix, get_canonical_intensity
@@ -8,14 +9,10 @@ import cv2
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
-from multiprocessing import Pool, cpu_count
-import multiprocessing as mp
 
-# Define a global variable to hold the arguments
-global global_args
-def compute_img_depths_single(args):
-    img, iters, downsample_factor, display_interval, output_dir = args
 
+''' compute depth map using gradient descent with variable step size'''
+def compute_img_depths(img, iters=50, downsample_factor=10, display_interval=100):
     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
     k, g_t, gamma = get_calibration(img)
     
@@ -29,7 +26,7 @@ def compute_img_depths_single(args):
     alpha = 0.001
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
-    patch_size = 5  # Set your desired patch size here
+    patch_size = 5  
     
     for i in tqdm(range(iters)):
         for row in range(0, img.shape[0], patch_size):
@@ -65,18 +62,13 @@ def compute_img_depths_single(args):
         prev_energy_function = energy_function.copy()
 
         error = np.sum(energy_function) / (img.shape[0] * img.shape[1])  # Expressed in percentage
+        print(f"Iteration {i+1}, Error: {error}")
         errors.append(error)
 
         if (i + 1) % display_interval == 0 or i == iters - 1:
-            display_depth_map(depth_map, i, output_dir)
+            display_depth_map(depth_map, i, args.output_dir)
 
     return depth_map, errors
-
-
-
-def compute_img_depths_parallel(args_global):
-    img, iters, downsample_factor, display_interval, args = args_global
-    return compute_img_depths_single(img, iters, downsample_factor, display_interval)
 
 
 def display_depth_map(depth_map, iteration, img_output):
@@ -108,26 +100,10 @@ def save_depth_map_heatmap(depth_map, iteration):
     plt.savefig(f'depthmap_heatmap_{iteration}.png')  # Save the heatmap image
     plt.close()
 
-def generate_point_cloud(depth_map, k, g_t, gamma):
-    point_cloud = []
-    for row in range(depth_map.shape[0]):
-        for col in range(depth_map.shape[1]):
-            d = depth_map[row, col]
-            K=get_intrinsic_matrix()
-            if d > 0:
-                u, v = [row, col]
-                x = (u - K[0, 2]) * d / K[0, 0] #adjust to camera intrinsic
-                y = (v - K[1, 2]) * d / K[1, 1]
-                z = d
-                point_cloud.append([x, y, z])
-    return np.array(point_cloud)
-
-
 
 def parseargs():
     parser = argparse.ArgumentParser(description="Photometric Dense 3D Reconstruction--Gut SLAM")
-    parser.add_argument('--dataset_path', type=str, help='Path to the dataset folder')
-    parser.add_argument('--batch_size', type=int, default=5, help='Batch size for processing')
+    parser.add_argument('--image_path', type=str, help='Path to the image file')
     parser.add_argument('--iters', type=int, default=50, help='Number of iterations')
     parser.add_argument('--downsample-factor', type=int, default=10, help='Downsample factor')
     parser.add_argument('--display-interval', type=int, default=100, help='Display interval')
@@ -137,49 +113,15 @@ def parseargs():
 
 if __name__=='__main__':
     args = parseargs()
-    dataset_path = args.dataset_path
-    batch_size = args.batch_size
+    img = cv2.imread(args.image_path)
 
-    image_files = [f for f in os.listdir(dataset_path) if os.path.isfile(os.path.join(dataset_path, f))]
+    depth_map, errors = compute_img_depths(img, args.iters, args.downsample_factor, args.display_interval)
 
-    num_processes=4
-
-    pool = Pool(cpu_count())  # Utilize all available CPU cores
-    
-
-    for batch_start in range(0, len(image_files), batch_size):
-        batch_images = []
-        for i in range(batch_size):
-            if batch_start + i < len(image_files):
-                img_path = os.path.join(dataset_path, image_files[batch_start + i])
-                img = cv2.imread(img_path)
-                batch_images.append(img)
-
-        if len(batch_images) > 0:
-            print(f"Processing batch starting from image {batch_start + 1}...")
-            batch_results = pool.map(compute_img_depths_single, [(img, args.iters, args.downsample_factor, args.display_interval, args.output_dir) for img in batch_images])
-
-            for i, (depth_map, errors) in enumerate(batch_results):
-                depth_map_path = os.path.join(args.output_dir, f'depthmap_batch_{batch_start + i + 1}.png')
-                pcl_output = os.path.join(args.output_dir, f'pcl_batch_{batch_start + i + 1}')
-                os.makedirs(pcl_output, exist_ok=True)
-
-                cv2.imwrite(depth_map_path, depth_map)
-                k=2.0
-                g_t=2.5
-                gamma=2.2
-
-                # Generate and save point cloud
-                point_cloud = generate_point_cloud(depth_map, k, g_t, gamma)
-                pcl_file_path = os.path.join(pcl_output, f'point_cloud_{batch_start + i + 1}.txt')
-                np.savetxt(pcl_file_path, point_cloud)
-
-                # Save error
-                with open(os.path.join(args.output_dir, f'errors_batch_{batch_start + 1}.txt'), 'w') as f:
-                    for error in errors:
-                        f.write(str(error) + '\n')
-
-    pool.close()
-    pool.join()
+    # Plotting error
+    plt.plot(range(1, args.iters+1), errors)
+    plt.title("Error Plot")
+    plt.xlabel("Iteration")
+    plt.ylabel("Error")
+    plt.show()
 
     print("Reconstruction Complete!")

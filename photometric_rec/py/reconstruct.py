@@ -28,6 +28,7 @@ def compute_img_depths(img, iters=50, downsample_factor=10, display_interval=100
     depth_map=1/np.sqrt(np.cos(0)) #depth map init with canonical intensity
     depth_map=np.full((img.shape[0],img.shape[1]),np.cos(0))
     errors = []
+    #per_pixel_errors=[]
 
     regularization_lambda = 1.0
     alpha = 0.001
@@ -57,13 +58,17 @@ def compute_img_depths(img, iters=50, downsample_factor=10, display_interval=100
 
         #error = np.sum(energy_function)
     
-        error=(np.sum(energy_function) / (img.shape[0] * img.shape[1]))*100 #expressed in percentage
-        print(f"Iteration {i+1}, Error: {error}%")
+        error=(np.sum(energy_function) / (img.shape[0] * img.shape[1])) #expressed in percentage
+        #per_pixel_error=np.mean(np.abs(energy_function))
+        print(f"Iteration {i+1}, Error: {error}")
         errors.append(error)
+        # per_pixel_errors.append(per_pixel_error)
 
         with open("./errors.txt", "w") as f:
             for e in errors:
                 f.write(str(e) + "\n")
+            # for p in per_pixel_errors:
+            #     f.write(str(p) + "\n")
 
         if (i + 1) % display_interval == 0 or i == iters - 1:
             display_depth_map(depth_map, i, args.output_dir)

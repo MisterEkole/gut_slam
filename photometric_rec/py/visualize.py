@@ -81,7 +81,7 @@ def visualize_point_cloud(point_cloud, bounding_volume=True):
 
 
 if __name__ == "__main__":
-    file_path = '/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt'
+    file_path = '/Users/ekole/Dev/gut_slam/photometric_rec/py/image_output/pcl_FrameBuffer_0358.png/point_cloud_FrameBuffer_0358.png.txt'
 
     # Load original point cloud
     original_pc = load_point_cloud(file_path)
