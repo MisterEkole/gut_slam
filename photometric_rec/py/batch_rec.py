@@ -23,6 +23,7 @@ def compute_img_depths_single(args):
     
     energy_function = np.zeros((img.shape[0], img.shape[1]))
     gradient = np.ones((img.shape[0], img.shape[1]))
+    depth_map=1/np.sqrt(np.cos(0)) #depth map init with canonical intensity
     depth_map = np.full((img.shape[0],img.shape[1]), np.cos(0))
     errors = []
     
@@ -30,7 +31,7 @@ def compute_img_depths_single(args):
     alpha = 0.001
     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
 
-    patch_size = 2 
+    patch_size = 5
     
     for i in tqdm(range(iters)):
         for row in range(0, img.shape[0], patch_size):
@@ -74,11 +75,19 @@ def compute_img_depths_parallel(args_global):
     img, iters, downsample_factor, args = args_global
     return compute_img_depths_single(img, iters, downsample_factor, args.output_dir)
 
+
+
 def save_depth_map(depth_map, img_name, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-    depth_map_img = cv2.normalize(src=depth_map, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+    # Normalize depth map to the range [0, 1]
+    depth_map_normalized = cv2.normalize(depth_map, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    # Scale depth map to the range [0, 255] and convert to uint8
+    depth_map_scaled = (depth_map_normalized * 255).astype(np.uint8)
+
+    # Apply colormap for better visualization
+    depth_map_colored = cv2.applyColorMap(depth_map_scaled, cv2.COLORMAP_JET)
     depth_map_path = os.path.join(output_dir, f'depthmap_{img_name}.png')
-    cv2.imwrite(depth_map_path, depth_map)
+    cv2.imwrite(depth_map_path, depth_map_colored)
 
 def save_point_cloud(point_cloud, img_name, output_dir):
     pcl_output = os.path.join(output_dir, f'pcl_{img_name}')
@@ -124,15 +133,23 @@ if __name__=='__main__':
     dataset_path = args.dataset_path
     batch_size = args.batch_size
     image_files = [f for f in os.listdir(dataset_path) if os.path.isfile(os.path.join(dataset_path, f))]
-    num_processes=4
-    pool = Pool(cpu_count())  # Utilize all available CPU cores
+    num_processes = 4
+    pool = Pool(num_processes)  # Create a multiprocessing pool
     for batch_start in range(0, len(image_files), batch_size):
         batch_images = []
         for i in range(batch_size):
             if batch_start + i < len(image_files):
                 img_path = os.path.join(dataset_path, image_files[batch_start + i])
-                img = cv2.imread(img_path)
-                batch_images.append((img, image_files[batch_start + i]))
+                if img_path.lower().endswith(('.png', '.jpg', '.jpeg')):  # Check if the file is an image
+                    print("Loading image:", img_path)  # Print the image path for debugging
+                    img = cv2.imread(img_path)
+                    if img is None:
+                        print("Failed to load image:", img_path)  # Print an error message if image loading fails
+                        continue
+                    print("Image shape:", img.shape)  # Print the shape of the loaded image for debugging
+                    batch_images.append((img, image_files[batch_start + i]))
+                else:
+                    print("Skipping non-image file:", img_path)
 
         if len(batch_images) > 0:
             print(f"Processing batch starting from image {batch_start + 1}...")
@@ -154,57 +171,4 @@ if __name__=='__main__':
 
 
 
-# def compute_img_depths_single(args):
-#     img, iters, downsample_factor, output_dir = args
 
-#     img = cv2.resize(img, None, fx=1/downsample_factor, fy=1/downsample_factor, interpolation=cv2.INTER_AREA)
-#     k, g_t, gamma = get_calibration(img)
-    
-#     energy_function = np.zeros((img.shape[0], img.shape[1]))
-#     depth_map = np.full((img.shape[0], img.shape[1]), 0.5)  # Initialize depth map with neutral value
-#     errors = []
-    
-#     regularization_lambda = 1.0
-#     alpha = 0.001
-#     prev_energy_function = np.zeros((img.shape[0], img.shape[1]))
-
-#     patch_size = 2 
-    
-#     for i in tqdm(range(iters)):
-#         for row in range(0, img.shape[0], patch_size):
-#             for col in range(0, img.shape[1], patch_size):
-#                 patch_img = img[row:row+patch_size, col:col+patch_size]
-#                 patch_depth_map = depth_map[row:row+patch_size, col:col+patch_size]
-#                 patch_energy_function = energy_function[row:row+patch_size, col:col+patch_size]
-
-#                 # Compute gradient of the depth map using finite differences
-#                 patch_depth_map_dx = np.gradient(patch_depth_map, axis=0)
-#                 patch_depth_map_dy = np.gradient(patch_depth_map, axis=1)
-#                 patch_gradient = np.sqrt(patch_depth_map_dx**2 + patch_depth_map_dy**2)
-
-#                 for patch_row in range(patch_img.shape[0]):
-#                     for patch_col in range(patch_img.shape[1]):
-#                         d = patch_depth_map[patch_row, patch_col]
-#                         u = patch_img[patch_row, patch_col]
-#                         x, y, z = unprojec_cam_model(u, d)
-#                         L = calib_p_model(x, y, d, k, g_t, gamma)
-#                         I = get_intensity(u)
-#                         C = cost_func(I, L)
-#                         R = reg_func(patch_gradient[patch_row, patch_col])
-#                         patch_energy_function[patch_row, patch_col] = C + regularization_lambda * R
-
-#                         # Perform gradient descent with adaptive step size
-#                         if i > 0:
-#                             # Update depth map using adaptive step size
-#                             step_size = alpha / np.sqrt(np.sum(patch_gradient[patch_row, patch_col] ** 2) + 1e-8)
-#                             patch_depth_map[patch_row, patch_col] -= step_size * patch_gradient[patch_row, patch_col]
-
-#                 depth_map[row:row+patch_size, col:col+patch_size] = patch_depth_map
-#                 energy_function[row:row+patch_size, col:col+patch_size] = patch_energy_function
-
-#         prev_energy_function = energy_function.copy()
-
-#         error = np.sum(energy_function) / (img.shape[0] * img.shape[1])  
-#         errors.append(error)
-
-#     return depth_map, errors
