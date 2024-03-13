@@ -52,7 +52,7 @@ def compute_img_depths_single(args):
                         R = reg_func(patch_gradient[patch_row, patch_col])
                         patch_energy_function[patch_row, patch_col] = C + regularization_lambda * R
 
-                        # Perform gradient descent for every pixel with variable step size
+                        # Perform gradient descent for every pixel patch with variable step size
                         if i > 0:
                             patch_gradient[patch_row, patch_col] = patch_energy_function[patch_row, patch_col] - prev_energy_function[row+patch_row, col+patch_col]
 
@@ -141,12 +141,12 @@ if __name__=='__main__':
             if batch_start + i < len(image_files):
                 img_path = os.path.join(dataset_path, image_files[batch_start + i])
                 if img_path.lower().endswith(('.png', '.jpg', '.jpeg')):  # Check if the file is an image
-                    print("Loading image:", img_path)  # Print the image path for debugging
+                    #print("Loading image:", img_path)  # Print the image path for debugging
                     img = cv2.imread(img_path)
                     if img is None:
                         print("Failed to load image:", img_path)  # Print an error message if image loading fails
                         continue
-                    print("Image shape:", img.shape)  # Print the shape of the loaded image for debugging
+                    #print("Image shape:", img.shape)  # Print the shape of the loaded image for debugging
                     batch_images.append((img, image_files[batch_start + i]))
                 else:
                     print("Skipping non-image file:", img_path)
