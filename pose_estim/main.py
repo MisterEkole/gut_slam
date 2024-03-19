@@ -2,8 +2,8 @@ from utils import *
 
 
 if __name__ =="__main__":
-    observed_point_cloud1 = read_point_cloud("/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud.txt")
-    observed_point_cloud2 = read_point_cloud("/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt")
+    observed_point_cloud1 = read_point_cloud("/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud2.txt")
+    observed_point_cloud2 = read_point_cloud("/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud2.txt")
     mesh_vertices = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]])
     control_points = np.array([[0.2, 0.2, 0], [0.8, 0.2, 0]])
 

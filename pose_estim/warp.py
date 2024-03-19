@@ -25,7 +25,7 @@ class WarpField:
         return deformed_mesh
 
     def weight_function(self, distance):
-        # Example: Linear falloff
+        
         max_distance = 1.0
         if distance <= max_distance:
             return 1 - distance / max_distance

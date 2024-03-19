@@ -81,7 +81,9 @@ def visualize_point_cloud(point_cloud, bounding_volume=True):
 
 
 if __name__ == "__main__":
-    file_path = '/Users/ekole/Dev/gut_slam/photometric_rec/py/image_output/pcl_FrameBuffer_0416.png/point_cloud_FrameBuffer_0416.png.txt'
+    #file_path = '/Users/ekole/GutSLAM_Rec/image_output/pcl_FrameBuffer_0300.png/point_cloud_FrameBuffer_0300.png.txt'
+    #file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt'
+    file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud.txt'
 
     # Load original point cloud
     original_pc = load_point_cloud(file_path)
@@ -90,17 +92,17 @@ if __name__ == "__main__":
     visualize_point_cloud(original_pc)
 
     # Downsample point cloud
-    downsampled_pc = downsample_point_cloud(original_pc)
+    # downsampled_pc = downsample_point_cloud(original_pc)
 
-    # Visualize the downsampled point cloud with bounding volume
-    visualize_point_cloud(downsampled_pc)
+    # # Visualize the downsampled point cloud with bounding volume
+    # visualize_point_cloud(downsampled_pc)
 
-    # Estimate vertex normals
-    point_cloud_with_normals = estimate_vertex_normals(downsampled_pc)
+    # # Estimate vertex normals
+    # point_cloud_with_normals = estimate_vertex_normals(downsampled_pc)
 
-    # Visualize the point cloud with vertex normals and bounding volume
-    visualize_point_cloud(point_cloud_with_normals)
+    # # Visualize the point cloud with vertex normals and bounding volume
+    # visualize_point_cloud(point_cloud_with_normals)
 
-    #compute and visualise convex hull
+    # #compute and visualise convex hull
 
-    compute_and_visualize_convex_hull(original_pc)
+    # compute_and_visualize_convex_hull(original_pc)
