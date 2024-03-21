@@ -8,7 +8,7 @@ if __name__ =="__main__":
     control_points = np.array([[0.2, 0.2, 0], [0.8, 0.2, 0]])
 
     intrinsic_params = {
-        'focal_length': 100,  # Example focal length in pixels
+        'focal_length': 100,  
         'principal_point': np.array([320, 240]), 
         'distortion_coeffs': np.ones(4)  
     }

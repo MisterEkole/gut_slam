@@ -43,7 +43,7 @@ class PoseDeformationEstimator:
         self.observed_point_cloud1 = observed_point_cloud1
         self.observed_point_cloud2 = observed_point_cloud2
         self.warp_field = WarpField(mesh_vertices, control_points)
-        self.camera_pose = np.zeros(6)  # [x, y, z, roll, pitch, yaw]
+        self.camera_pose = np.zeros(6)  
         self.intrinsic_params = intrinsic_params
 
     def project_mesh(self):

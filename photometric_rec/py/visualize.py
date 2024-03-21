@@ -79,17 +79,43 @@ def visualize_point_cloud(point_cloud, bounding_volume=True):
     else:
         o3d.visualization.draw_geometries([point_cloud])
 
+def compute_and_visualize_cylinder(point_cloud):
+    # Estimate bounding box
+    bounding_box = point_cloud.get_axis_aligned_bounding_box()
+    min_bound = bounding_box.get_min_bound()
+    max_bound = bounding_box.get_max_bound()
 
+    # Estimate cylinder parameters
+    center = np.mean([min_bound, max_bound], axis=0)
+    height = np.linalg.norm(max_bound - min_bound)
+    radius = height / 2
+
+    # Create cylinder mesh
+    cylinder_mesh = o3d.geometry.TriangleMesh.create_cylinder(radius=radius, height=height)
+
+    # Align cylinder with the point cloud
+    rotation_matrix = np.eye(3)
+    direction = max_bound - min_bound
+    direction /= np.linalg.norm(direction)
+    rotation_matrix[:3, 2] = direction
+    cylinder_mesh.rotate(rotation_matrix, center=center)
+
+    # Translate cylinder to the center
+    cylinder_mesh.translate(center)
+
+    # Visualize the point cloud and cylinder
+    o3d.visualization.draw_geometries([point_cloud, cylinder_mesh])
 if __name__ == "__main__":
     #file_path = '/Users/ekole/GutSLAM_Rec/image_output/pcl_FrameBuffer_0300.png/point_cloud_FrameBuffer_0300.png.txt'
-    #file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt'
-    file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud.txt'
+    file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt'
+    #file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud.txt'
 
     # Load original point cloud
     original_pc = load_point_cloud(file_path)
 
     # Visualize the original point cloud with bounding volume
     visualize_point_cloud(original_pc)
+    #compute_and_visualize_cylinder(original_pc)
 
     # Downsample point cloud
     # downsampled_pc = downsample_point_cloud(original_pc)
