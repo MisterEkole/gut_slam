@@ -40,24 +40,37 @@ class WarpField:
 
 class PoseDeformationEstimator:
     def __init__(self, observed_point_cloud1, observed_point_cloud2, mesh_vertices, control_points, intrinsic_params):
-        self.observed_point_cloud1 = observed_point_cloud1
-        self.observed_point_cloud2 = observed_point_cloud2
+        self.observed_point_cloud1 = o3d.geometry.PointCloud()
+        self.observed_point_cloud1.points = o3d.utility.Vector3dVector(observed_point_cloud1)
+
+        self.observed_point_cloud2 = o3d.geometry.PointCloud()
+        self.observed_point_cloud2.points = o3d.utility.Vector3dVector(observed_point_cloud2)
+
+        # self.observed_point_cloud1 = o3d.geometry.PointCloud(observed_point_cloud1)
+        # self.observed_point_cloud2 = o3d.geometry.PointCloud(observed_point_cloud2)
         self.warp_field = WarpField(mesh_vertices, control_points)
         self.camera_pose = np.zeros(6)  
         self.intrinsic_params = intrinsic_params
 
     def project_mesh(self):
-        translated_mesh = self.warp_field.mesh_vertices + self.camera_pose[:3]
+        deformed_mesh = self.warp_field.deform_mesh()
+        translated_mesh = deformed_mesh + self.camera_pose[:3]
         rotated_mesh = self.rotate_points(translated_mesh, self.camera_pose[3:])
         image_points = self.project_to_image(rotated_mesh)
         return image_points
+    
+    #bugs here, i will fix later
 
     def project_to_image(self, points_3d):
         focal_length = self.intrinsic_params['focal_length']
         principal_point = self.intrinsic_params['principal_point']
         distortion_coeffs = self.intrinsic_params['distortion_coeffs']
 
-        points_2d = points_3d[:, :2] / points_3d[:, 2].reshape(-1, 1) * focal_length + principal_point
+        epsilon = 1e-6
+        points_2d = points_3d[:, :2] / (points_3d[:, 2].reshape(-1, 1) + epsilon) * focal_length + principal_point
+
+
+        #points_2d = points_3d[:, :2] / points_3d[:, 2].reshape(-1, 1) * focal_length + principal_point
 
         r = np.linalg.norm(points_2d - principal_point, axis=1)
         k1, k2, p1, p2 = distortion_coeffs
@@ -89,21 +102,38 @@ class PoseDeformationEstimator:
         return rotation_matrix
     
 
+    # def cost_function(self, parameters):
+    #     num_camera_pose_params = 6
+    #     num_deformation_params = self.warp_field.num_control_points * 3
+    #     pose_params = parameters[:num_camera_pose_params]
+    #     deformation_params = parameters[num_camera_pose_params:num_camera_pose_params + num_deformation_params]
+        
+    #     self.warp_field.displacement_vectors = deformation_params.reshape(-1, 3)
+    #     projected_mesh = self.project_mesh()
+        
+    #     #error1 = np.mean(np.linalg.norm(projected_mesh - self.observed_point_cloud1, axis=1))
+    #     #error2 = np.mean(np.linalg.norm(projected_mesh - self.observed_point_cloud2, axis=1))
+    #     error=np.mean(np.linalg.norm(self.observed_point_cloud1 - self.observed_point_cloud2, axis=1))
+    #     return error
+    
     def cost_function(self, parameters):
-        num_camera_pose_params = 6
-        num_deformation_params = self.warp_field.num_control_points * 3
-        pose_params = parameters[:num_camera_pose_params]
-        deformation_params = parameters[num_camera_pose_params:num_camera_pose_params + num_deformation_params]
-        
-        self.warp_field.displacement_vectors = deformation_params.reshape(-1, 3)
-        projected_mesh = self.project_mesh()
-        
-        #error1 = np.mean(np.linalg.norm(projected_mesh - self.observed_point_cloud1, axis=1))
-        #error2 = np.mean(np.linalg.norm(projected_mesh - self.observed_point_cloud2, axis=1))
-        error=np.mean(np.linalg.norm(self.observed_point_cloud1 - self.observed_point_cloud2, axis=1))
-        return error
-   
+        self.camera_pose=parameters[:6]
+        deformation_params = parameters[6:].reshape(-1, 3)
+        self.warp_field.displacement_vectors = deformation_params
 
+        projected_mesh=self.project_mesh()
+        projected_pcd=o3d.geometry.PointCloud()
+        projected_pcd.points=o3d.utility.Vector3dVector(projected_mesh)
+
+
+        #measure error as projected mesh and observed point cloud
+        error1=projected_pcd.compute_point_cloud_distance(self.observed_point_cloud1)
+        error2=projected_pcd.compute_point_cloud_distance(self.observed_point_cloud2)
+
+        total_error=np.mean(error1+error2)
+
+        return total_error
+   
 
     def gauss_newton(self, initial_parameters, max_iterations=100, tolerance=1e-5):
         parameters = initial_parameters.copy()
@@ -118,10 +148,11 @@ class PoseDeformationEstimator:
                 break
             prev_cost = cost
         return parameters
-
+    
     def numerical_jacobian(self, func, params, epsilon=1e-5):
         num_params = len(params)
-        num_residuals = self.observed_point_cloud1.shape[0] + self.observed_point_cloud2.shape[0]
+    
+        num_residuals = len(self.observed_point_cloud1.points) + len(self.observed_point_cloud2.points)
         jacobian = np.zeros((num_residuals, num_params))
         for i in range(num_params):
             original_value = params[i]
@@ -129,9 +160,10 @@ class PoseDeformationEstimator:
             cost_plus = func(params)
             params[i] = original_value - epsilon
             cost_minus = func(params)
-            jacobian[:, i] = (cost_plus - cost_minus) / epsilon
+            jacobian[:, i] = (cost_plus - cost_minus) / (2 * epsilon)
             params[i] = original_value
         return jacobian
+
 
     def numerical_residuals(self, func, params, epsilon=1e-5):
         num_params = len(params)
