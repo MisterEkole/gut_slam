@@ -1,190 +1,195 @@
-''' Utils for pose estimation 
+''' Utils for pose  and deformation estimation 
 Author: Mitterand Ekole
 Date: 16-03-2024
 '''
 
 import numpy as np
 import open3d as o3d
+import pyvista as pv
 
 class WarpField:
-    def __init__(self, mesh_vertices, control_points):
-        self.mesh_vertices = mesh_vertices
-        self.control_points = control_points
-        self.num_vertices = len(mesh_vertices)
-        self.num_control_points = len(control_points)
-        self.displacement_vectors = np.zeros((self.num_control_points, 3))
+    """
+        Initialize the WarpField class with cylinder parameters.
 
-    def deform_mesh(self):
-        deformed_mesh = np.zeros_like(self.mesh_vertices)
-        for i in range(self.num_vertices):
-            weighted_sum = np.zeros(3)
-            total_weight = 0
-            for j in range(self.num_control_points):
-                distance = np.linalg.norm(self.mesh_vertices[i] - self.control_points[j])
-                weight = self.weight_function(distance)
-                weighted_sum += weight * self.displacement_vectors[j]
-                total_weight += weight
-            if total_weight > 0:
-                deformed_mesh[i] = self.mesh_vertices[i] + weighted_sum / total_weight
-            else:
-                deformed_mesh[i] = self.mesh_vertices[i]
-        return deformed_mesh
-    
-    def weight_function(self, distance):
-        max_distance = 1.0
-        if distance <= max_distance:
-            return 1 - distance / max_distance
-        else:
-            return 0
+        Parameters:
+        - radius: The radius of the base of the cylinder.
+        - height: The height of the cylinder.
+        - vanishing_point: A tuple (x, y, z) representing the vanishing point which influences the cylinder's orientation.
+        - center: A tuple (x, y, z) representing the center of the base of the cylinder.
+        - resolution: The number of points around the circumference of the cylinder.
+        """
+    def __init__(self, radius, height,vanishing_pts,center=(0,0,0),resolution=100):
+        self.radius = radius
+        self.height = height
+        self.center = np.array(center)
+        self.resolution = resolution
+        self.vanishing_pts=np.array(vanishing_pts)
+        self.cylinder=self.create_cylinder()
+
+    def create_cylinder(self):
+        'Generate cylindrical mesh considering vp and center'
+        direction=self.vanishing_pts-self.center
+        cylinder = pv.Cylinder(radius=self.radius, height=self.height, direction=direction, center=self.center, resolution=self.resolution)
+        return cylinder
+
+    def apply_deformation(self, strength=0.1, frequency=1):
+        'Apply non-rigid deformation to the cylinder mesh'
+        # Get the points of the cylinder mesh
+        points = self.cylinder.points
+        points[:,0]+=strength*np.sin(frequency*points[:,0])
+        points[:,1]+=strength*np.cos(frequency*points[:,1])
+        points[:,2]+=strength*np.sin(frequency*points[:,2])
+        self.cylinder.points = points
+
+    def extract_pcd(self):
+        'Extract point cloud from the cylinder mesh'
+        pcd = self.cylinder.points
+        return pcd
+    def save_point_cloud(self, filename):
+        """
+        Save the point cloud data of the deformable mesh to a text file.
+
+        Parameters:
+        - filename: The name of the file where the point cloud data will be saved.
+        """
+        point_cloud = self.extract_pcd()
+        np.savetxt(filename, point_cloud, delimiter=',')
+
+    def densify_point_cloud(self, target_count):
+        """
+        Densify the cylinder's point cloud to a specified target count.
+        This method interpolates new points to increase the density of the point cloud.
+        """
+        # Extract current point cloud
+        points = self.extract_pcd()
+
+       
+        # Calculate factor to increase the number of points
+        current_count = len(points)
+        factor = np.ceil(target_count / current_count).astype(int)
+
+        # Initialize new points array
+        densified_points = np.empty((0, 3), dtype=np.float64)
+
+        # Simple densification: repeat each point 'factor' times
+        # Note: This is a placeholder. For actual densification, consider interpolating between points
+        for point in points:
+            repeated_points = np.tile(point, (factor, 1))
+            densified_points = np.vstack((densified_points, repeated_points))
+
         
-
-class PoseDeformationEstimator:
-    def __init__(self, observed_point_cloud1, observed_point_cloud2, mesh_vertices, control_points, intrinsic_params):
-        self.observed_point_cloud1 = o3d.geometry.PointCloud()
-        self.observed_point_cloud1.points = o3d.utility.Vector3dVector(observed_point_cloud1)
-
-        self.observed_point_cloud2 = o3d.geometry.PointCloud()
-        self.observed_point_cloud2.points = o3d.utility.Vector3dVector(observed_point_cloud2)
-
-        # self.observed_point_cloud1 = o3d.geometry.PointCloud(observed_point_cloud1)
-        # self.observed_point_cloud2 = o3d.geometry.PointCloud(observed_point_cloud2)
-        self.warp_field = WarpField(mesh_vertices, control_points)
-        self.camera_pose = np.zeros(6)  
-        self.intrinsic_params = intrinsic_params
-
-    def project_mesh(self):
-        deformed_mesh = self.warp_field.deform_mesh()
-        translated_mesh = deformed_mesh + self.camera_pose[:3]
-        rotated_mesh = self.rotate_points(translated_mesh, self.camera_pose[3:])
-        image_points = self.project_to_image(rotated_mesh)
-        return image_points
+        self.cylinder.points = densified_points[:target_count]
     
-    #bugs here, i will fix later
+    
+class PointCloudPreparer:
+    def __init__(self, target_num_points=None, normalize=False):
+        """
+        Initialize the PointCloudPreparer.
 
-    def project_to_image(self, points_3d):
-        focal_length = self.intrinsic_params['focal_length']
-        principal_point = self.intrinsic_params['principal_point']
-        distortion_coeffs = self.intrinsic_params['distortion_coeffs']
+        Parameters:
+        - target_num_points: The target number of points for downsampling. If None, downsampling is not performed.
+        - normalize: A boolean indicating whether the point clouds should be normalized.
+        """
+        self.target_num_points = target_num_points
+        self.normalize = normalize
+    
+    def read_point_cloud_from_txt(self, file_path):
+        """
+        Reads a point cloud from a text file, attempting to automatically detect the delimiter.
 
-        epsilon = 1e-6
-        points_2d = points_3d[:, :2] / (points_3d[:, 2].reshape(-1, 1) + epsilon) * focal_length + principal_point
+        Parameters:
+        - file_path: The path to the .txt file containing the point cloud data.
+
+        Returns:
+        - A NumPy array containing the point cloud.
+        """
+        # Attempt to read with common delimiters and select the one that works
+        for delimiter in [',', ' ']:
+            try:
+                return np.loadtxt(file_path, delimiter=delimiter)
+            except ValueError:
+                continue
+        # If neither delimiter worked, raise an error
+        raise ValueError(f"Failed to automatically detect delimiter and read point cloud data from {file_path}.")
 
 
-        #points_2d = points_3d[:, :2] / points_3d[:, 2].reshape(-1, 1) * focal_length + principal_point
+    def downsample(self, pc):
+        """Downsample the point cloud to a specific number of points."""
+        if self.target_num_points is not None and pc.shape[0] > self.target_num_points:
+            indices = np.random.choice(pc.shape[0], self.target_num_points, replace=False)
+            return pc[indices]
+        return pc
 
-        r = np.linalg.norm(points_2d - principal_point, axis=1)
-        k1, k2, p1, p2 = distortion_coeffs
-        radial_distortion = 1 + k1 * r ** 2 + k2 * r ** 4
-        tangential_distortion_x = 2 * p1 * (points_2d[:, 0] - principal_point[0]) * (points_2d[:, 1] - principal_point[1])
-        tangential_distortion_y = 2 * p2 * (points_2d[:, 1] - principal_point[1]) * (points_2d[:, 0] - principal_point[0])
-        points_2d[:, 0] += tangential_distortion_x
-        points_2d[:, 1] += tangential_distortion_y
+    def normalize_points(self, pc):
+        """Normalize the point cloud to have zero mean and fit within the range [-1, 1]."""
+        pc -= np.mean(pc, axis=0)  # Center to zero
+        max_abs_val = np.max(np.abs(pc))
+        pc /= max_abs_val  # Scale to [-1, 1]
+        return pc
+
+    def prepare(self, pc):
+        """
+        Apply downsampling and normalization to the point cloud based on the initialization parameters.
+
+        Parameters:
+        - pc: The point cloud as a NumPy array.
+
+        Returns:
+        - The prepared point cloud as a NumPy array.
+        """
+        pc = self.downsample(pc)
+        if self.normalize:
+            pc = self.normalize_points(pc)
+        return pc
+    
+    def align_point_clouds(self, source_pc, target_pc, threshold=1.0):
+        """
+        Align two point clouds using the ICP algorithm.
+
+        Parameters:
+        - source_pc: The source point cloud as a NumPy array.
+        - target_pc: The target point cloud as a NumPy array to align to the source.
+        - threshold: The distance threshold to consider for point matches.
+
+        Returns:
+        - Aligned version of target_pc as a NumPy array.
+        """
+        # Convert numpy arrays to Open3D point clouds
+        source = o3d.geometry.PointCloud()
+        source.points = o3d.utility.Vector3dVector(source_pc)
+        target = o3d.geometry.PointCloud()
+        target.points = o3d.utility.Vector3dVector(target_pc)
+
+        # Perform ICP alignment
+        trans_init = np.identity(4)  # Initial transformation
+        reg_p2p = o3d.pipelines.registration.registration_icp(
+            source, target, threshold, trans_init,
+            o3d.pipelines.registration.TransformationEstimationPointToPoint())
         
-        return points_2d
+        # Apply the transformation to the target point cloud
+        target.transform(reg_p2p.transformation)
 
-    def rotate_points(self, points, angles):
-        roll, pitch, yaw = angles
-        rotation_matrix = self.euler_to_rotation_matrix(roll, pitch, yaw)
-        rotated_points = np.dot(points, rotation_matrix.T)
-        return rotated_points
+        # Return the aligned point cloud as a numpy array
+        return np.asarray(target.points)
 
-    def euler_to_rotation_matrix(self, roll, pitch, yaw):
-        R_x = np.array([[1, 0, 0],
-                        [0, np.cos(roll), -np.sin(roll)],
-                        [0, np.sin(roll), np.cos(roll)]])
-        R_y = np.array([[np.cos(pitch), 0, np.sin(pitch)],
-                        [0, 1, 0],
-                        [-np.sin(pitch), 0, np.cos(pitch)]])
-        R_z = np.array([[np.cos(yaw), -np.sin(yaw), 0],
-                        [np.sin(yaw), np.cos(yaw), 0],
-                        [0, 0, 1]])
-        rotation_matrix = np.dot(R_z, np.dot(R_y, R_x))
-        return rotation_matrix
     
+def visualize_point_clouds(pc1, pc2):
+    """
+    Visualizes two point clouds using Open3D.
 
-    # def cost_function(self, parameters):
-    #     num_camera_pose_params = 6
-    #     num_deformation_params = self.warp_field.num_control_points * 3
-    #     pose_params = parameters[:num_camera_pose_params]
-    #     deformation_params = parameters[num_camera_pose_params:num_camera_pose_params + num_deformation_params]
-        
-    #     self.warp_field.displacement_vectors = deformation_params.reshape(-1, 3)
-    #     projected_mesh = self.project_mesh()
-        
-    #     #error1 = np.mean(np.linalg.norm(projected_mesh - self.observed_point_cloud1, axis=1))
-    #     #error2 = np.mean(np.linalg.norm(projected_mesh - self.observed_point_cloud2, axis=1))
-    #     error=np.mean(np.linalg.norm(self.observed_point_cloud1 - self.observed_point_cloud2, axis=1))
-    #     return error
-    
-    def cost_function(self, parameters):
-        self.camera_pose=parameters[:6]
-        deformation_params = parameters[6:].reshape(-1, 3)
-        self.warp_field.displacement_vectors = deformation_params
+    Parameters:
+    - pc1: The first point cloud as a NumPy array.
+    - pc2: The second point cloud as a NumPy array.
+    """
+    # Convert the NumPy arrays to Open3D point cloud objects
+    pcd1 = o3d.geometry.PointCloud()
+    pcd1.points = o3d.utility.Vector3dVector(pc1)
+    pcd1.paint_uniform_color([1, 0, 0])  # Red color for the first point cloud
 
-        projected_mesh=self.project_mesh()
-        projected_pcd=o3d.geometry.PointCloud()
-        projected_pcd.points=o3d.utility.Vector3dVector(projected_mesh)
+    pcd2 = o3d.geometry.PointCloud()
+    pcd2.points = o3d.utility.Vector3dVector(pc2)
+    pcd2.paint_uniform_color([0, 0, 1])  # Blue color for the second point cloud
 
+    #visualize the prepared point clouds using Open3D
+    o3d.visualization.draw_geometries([pcd1, pcd2])
 
-        #measure error as projected mesh and observed point cloud
-        error1=projected_pcd.compute_point_cloud_distance(self.observed_point_cloud1)
-        error2=projected_pcd.compute_point_cloud_distance(self.observed_point_cloud2)
-
-        total_error=np.mean(error1+error2)
-
-        return total_error
-   
-
-    def gauss_newton(self, initial_parameters, max_iterations=100, tolerance=1e-5):
-        parameters = initial_parameters.copy()
-        prev_cost = float('inf')
-        for i in range(max_iterations):
-            jacobian = self.numerical_jacobian(self.cost_function, parameters)
-            residuals = self.numerical_residuals(self.cost_function, parameters)
-            update = np.linalg.lstsq(jacobian, residuals, rcond=None)[0]
-            parameters -= update
-            cost = self.cost_function(parameters)
-            if abs(cost - prev_cost) < tolerance:
-                break
-            prev_cost = cost
-        return parameters
-    
-    def numerical_jacobian(self, func, params, epsilon=1e-5):
-        num_params = len(params)
-    
-        num_residuals = len(self.observed_point_cloud1.points) + len(self.observed_point_cloud2.points)
-        jacobian = np.zeros((num_residuals, num_params))
-        for i in range(num_params):
-            original_value = params[i]
-            params[i] = original_value + epsilon
-            cost_plus = func(params)
-            params[i] = original_value - epsilon
-            cost_minus = func(params)
-            jacobian[:, i] = (cost_plus - cost_minus) / (2 * epsilon)
-            params[i] = original_value
-        return jacobian
-
-
-    def numerical_residuals(self, func, params, epsilon=1e-5):
-        num_params = len(params)
-        residuals = np.zeros(num_params)
-        for i in range(num_params):
-            original_value = params[i]
-            params[i] = original_value + epsilon
-            cost_plus = func(params)
-            residuals[i] = (func(params) - cost_plus) / epsilon
-            params[i] = original_value
-        return residuals
-    
-
-def read_point_cloud(filename):
-    cloud = np.loadtxt(filename)
-    return cloud
-
-def save_point_cloud(filename, point_cloud):
-    np.savetxt(filename, point_cloud)
-
-def visualize_point_cloud(point_cloud):
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(point_cloud)
-    o3d.visualization.draw_geometries([pcd])
