@@ -46,11 +46,20 @@ def get_intrinsic_matrix():
     return K
 
 def unprojec_cam_model(u,d):
+    
     #kanalabrandt unprojection model
     #map 2D pixel val u to 3D point d
+    # if isinstance(u,(tuple, list,np.ndarray)):
+    #     u0, u1 = u[0], u[1] if isinstance(u, (tuple, list)) else u
+    # else:
+    #     #u is scalar, assume u is first component
+    #     u0, u1 = u,0
+       
 
     cx,cy,fx,fy,k1,k2,k3,k4=get_cam_params()
     mx=(u[0]-cx)/fx
+    #mx=(u0-cx)/fx
+   # my=(u1-cy)/fy
     my=(u[1]-cy)/fy
     r=np.sqrt(mx**2+my**2)**0.5
 
@@ -71,3 +80,8 @@ def unprojec_cam_model(u,d):
 def get_intensity(pixel):
   r,g,b = pixel
   return (float(r) + float(g) + float(b)) / (255*3)
+
+def get_canonical_intensity(img, k, g_t, gamma):
+    # Compute canonical intensity using the given formula
+    intensity = np.cos(0) / (1.0 ** 2)  # Replace 0 and 1.0 with actual values based on your data
+    return intensity
