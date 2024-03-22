@@ -11,9 +11,9 @@ warp_field.save_point_cloud('deformed_cylinder_point_cloud.txt')
 # point_cloud = warp_field.extract_pcd()
 # #print(point_cloud)  # This will display the 3D points of the deformed cylinder
 # # Optionally, visualize the deformed cylinder using PyVista
-plotter = pv.Plotter()
-plotter.add_mesh(warp_field.cylinder, color='lightblue', show_edges=True)
-plotter.show()
+# plotter = pv.Plotter()
+# plotter.add_mesh(warp_field.cylinder, color='lightblue', show_edges=True)
+# plotter.show()
 
 if __name__ == "__main__":
     pcd_preparer = PointCloudPreparer(target_num_points=10000, normalize=True) #instance of PointCloudPreparer
