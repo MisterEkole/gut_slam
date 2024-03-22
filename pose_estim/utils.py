@@ -36,22 +36,16 @@ class WarpField:
         'Apply non-rigid deformation to the cylinder mesh'
         # Get the points of the cylinder mesh
         points = self.cylinder.points
-        points[:,0]+=strength*np.sin(frequency*points[:,0])
+        points[:,0]+=strength*np.sin(frequency*points[:,0]) #apply deformation to x,y,z
         points[:,1]+=strength*np.cos(frequency*points[:,1])
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
 
     def extract_pcd(self):
-        'Extract point cloud from the cylinder mesh'
         pcd = self.cylinder.points
         return pcd
+    
     def save_point_cloud(self, filename):
-        """
-        Save the point cloud data of the deformable mesh to a text file.
-
-        Parameters:
-        - filename: The name of the file where the point cloud data will be saved.
-        """
         point_cloud = self.extract_pcd()
         np.savetxt(filename, point_cloud, delimiter=',')
 
@@ -71,8 +65,8 @@ class WarpField:
         # Initialize new points array
         densified_points = np.empty((0, 3), dtype=np.float64)
 
-        # Simple densification: repeat each point 'factor' times
-        # Note: This is a placeholder. For actual densification, consider interpolating between points
+        # Simple densification: repeat each point 'factor' times ~alternative: we can use interpolation
+        
         for point in points:
             repeated_points = np.tile(point, (factor, 1))
             densified_points = np.vstack((densified_points, repeated_points))
@@ -130,12 +124,6 @@ class PointCloudPreparer:
     def prepare(self, pc):
         """
         Apply downsampling and normalization to the point cloud based on the initialization parameters.
-
-        Parameters:
-        - pc: The point cloud as a NumPy array.
-
-        Returns:
-        - The prepared point cloud as a NumPy array.
         """
         pc = self.downsample(pc)
         if self.normalize:
