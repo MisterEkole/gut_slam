@@ -36,8 +36,8 @@ class WarpField:
         'Apply non-rigid deformation to the cylinder mesh'
         # Get the points of the cylinder mesh
         points = self.cylinder.points
-        points[:,0]+=strength*np.sin(frequency*points[:,0]) #apply deformation to x,y,z
-        points[:,1]+=strength*np.cos(frequency*points[:,1])
+        #points[:,0]+=strength*np.sin(frequency*points[:,0]) #apply deformation to x,y,z
+        #points[:,1]+=strength*np.cos(frequency*points[:,1])
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
 
