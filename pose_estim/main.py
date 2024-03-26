@@ -3,7 +3,7 @@ import open3d as o3d
 
 ''' init warp field instance creation and pcd save'''
 warp_field = WarpField(radius=1.0, height=2.0, vanishing_pts=(0, 0, 10), center=(10, 10, 10), resolution=500)
-warp_field.apply_deformation(strength=0.3, frequency=2)
+warp_field.apply_deformation(strength=0.3, frequency=1)
 warp_field.densify_point_cloud(target_count=2000)
 warp_field.save_point_cloud('deformed_cylinder_point_cloud.txt')
 

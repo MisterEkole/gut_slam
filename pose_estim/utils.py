@@ -40,6 +40,35 @@ class WarpField:
         #points[:,1]+=strength*np.cos(frequency*points[:,1])
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
+    
+    # def apply_deformation(self, strength=0.1, frequency=1):
+    #     # Get the points of the cylinder mesh
+    #     points = self.cylinder.points
+    #     # Convert to cylindrical coordinates (r, phi, z)
+    #     x, y, z = points[:, 0], points[:, 1], points[:, 2]
+    #     r = np.sqrt(x**2 + y**2)
+    #     phi = np.arctan2(y, x)
+    #     # Apply a twist deformation as a function of height (z)
+    #     twist_phi = phi + strength * np.sin(frequency * z)
+    #     # Convert back to Cartesian coordinates, keeping r constant to preserve the radius
+    #     points[:, 0] = r * np.cos(twist_phi)
+    #     points[:, 1] = r * np.sin(twist_phi)
+    #     # Update the cylinder points
+    #     self.cylinder.points = points
+
+    # def apply_deformation(self, strength=0.1, frequency=1):
+    #     # Get the points of the cylinder mesh
+    #     points = self.cylinder.points
+        
+    #     # Normalize the z-coordinates to the range [0, 1] for consistent bending regardless of the actual height
+    #     z_normalized = (points[:, 2] - points[:, 2].min()) / self.height
+        
+    #     # Apply a sine-based bending deformation
+    #     # The deformation causes the cylinder to bend along the x-axis
+    #     # You can adjust this to bend along a different axis or in a different manner as needed
+    #     points[:, 0] += strength * np.sin(frequency * np.pi * z_normalized)
+        
+    #     self.cylinder.points = points
 
     def extract_pcd(self):
         pcd = self.cylinder.points
@@ -65,7 +94,7 @@ class WarpField:
         # Initialize new points array
         densified_points = np.empty((0, 3), dtype=np.float64)
 
-        # Simple densification: repeat each point 'factor' times ~alternative: we can use interpolation
+        # Simple densification: repeat each point 'factor' times ~alternative: linear interpolation
         
         for point in points:
             repeated_points = np.tile(point, (factor, 1))

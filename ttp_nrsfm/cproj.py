@@ -5,8 +5,9 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import cv2
 import pyvista as pv
 
-def create_cylinder(radius, height, num_pixel_points=3):  #exponential grid spacing
-    num_points = int(2 * np.pi * radius * num_pixel_points)
+def create_cylinder(radius, height, num_pixel_points=10):  #exponential grid spacing
+    #num_points = int(2 * np.pi * radius * num_pixel_points)
+    num_points=360
     theta = np.linspace(0, 2 * np.pi, num_points)
     x = radius * np.cos(theta)
     y = radius * np.sin(theta)
@@ -14,12 +15,7 @@ def create_cylinder(radius, height, num_pixel_points=3):  #exponential grid spac
     zmin = 0.01  
     z = np.exp(lambda_val * np.linspace(np.log(zmin)/lambda_val, np.log(height)/lambda_val, num_points))
     return np.column_stack((x, y, z))
-# def create_cylinder(radius, height, num_points=100):
-#     """Generate a cylindrical mesh."""
-#     # Create a cylinder
-#     cylinder = pv.Cylinder(radius=radius, height=height, direction=(0, 0, 1), 
-#                            center=(0, 0, height / 2), resolution=num_points)
-#     return cylinder
+
 def update_cylinder_position(event):
     if event.inaxes == ax_2d:
         new_center = np.array([event.xdata, event.ydata])
@@ -32,9 +28,9 @@ def update_cylinder(new_center):
     cylinder_points[:, :2] += new_center - np.mean(cylinder_points[:, :2], axis=0)
     
     # Project 3D points onto the updated image
-    projected_points = project_points_onto_image(cylinder_points)
-    #projected_points = project_points_onto_image_with_perspective(cylinder_points)
-      # Print the new projected points
+    projected_points = project_points_onto_image(cylinder_points) *image_resolution
+   
+      
     print("New projected points on 2D image:")
     for point in projected_points:
         print(point)
@@ -44,7 +40,7 @@ def update_cylinder(new_center):
     ax_3d.cla()
     
     # Update the 3D plot for 3D projection
-    #mesh.remove()
+ 
     mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='b', alpha=1)
 
     
@@ -64,10 +60,12 @@ def update_cylinder(new_center):
 
 def get_camera_parameters():
     # Camera parameters (intrinsic matrix)
-    fx = 500.0  
-    fy = 500.0  
-    cx = image_resolution[0] / 2  
-    cy = image_resolution[1] / 2  
+    fx = 735.37
+    fy = 552.0 
+    cx = image_resolution[0] / 2
+    #cx=717.21 
+    cy = image_resolution[1] / 2 
+    #cy=717.48 
 
     camera_matrix = np.array([[fx, 0, cx],
                              [0, fy, cy],
@@ -80,14 +78,13 @@ def project_points_onto_image(points_3d):
     cam=get_camera_parameters()
     homogeneous_coords = np.hstack((points_3d, np.ones((points_3d.shape[0], 1))))
     homogeneous_coords = homogeneous_coords[:, :3]
-    points_2d_homogeneous = np.dot(homogeneous_coords, cam.T)
+    points_2d_homogeneous = np.dot(homogeneous_coords, cam)
     
     # Check for division by zero
     mask = (points_2d_homogeneous[:, 2] != 0)
     
     # Avoid division by zero and replace invalid values with nan
-    #import pdb; pdb.set_trace()
-    #points_2d=np.empty_like(points_2d_homogeneous)
+  
     points_2d = np.empty_like(points_2d_homogeneous[:, :2])
     points_2d[mask] = points_2d_homogeneous[mask, :2] / points_2d_homogeneous[mask, 2:]
     points_2d[~mask] = np.nan
@@ -95,26 +92,6 @@ def project_points_onto_image(points_3d):
     return points_2d
 
 
-
-def project_points_onto_image_with_perspective(points_3d, focal_length=500, image_center=(0, 0), near=0.1, far=50.0):
-    fx, fy = focal_length, focal_length
-    cx, cy = image_center
-
-    A = -(far + near) / (far - near)
-    B = -(2 * far * near) / (far - near)
-    perspective_matrix = np.array([
-    [fx, 0, cx, 0],
-    [0, fy, cy, 0],
-    [0, 0, A, B],
-    [0, 0, -1, 0]
-                    ])
-
-    homogeneous_coords = np.hstack((points_3d, np.ones((points_3d.shape[0], 1))))
-
-    points_2d_homogeneous = np.dot(homogeneous_coords, perspective_matrix.T)
-    # Convert back to 2D points from homogeneous coordinates
-    points_2d = points_2d_homogeneous[:, :2] / points_2d_homogeneous[:, 3:]
-    return points_2d
 
 # def apply_deformation(cylinder_points, deformation_strength=0.5, deformation_frequency=2):
 #     """
@@ -132,18 +109,9 @@ def project_points_onto_image_with_perspective(points_3d, focal_length=500, imag
 #     cylinder_points[:, 2] += deformation_strength * np.sin(deformation_frequency * cylinder_points[:, 0])
 #     return cylinder_points
 
-# def apply_deformation(mesh, deformation_strength=0.5, deformation_frequency=2):
-#     """Apply a simple deformation to the cylinder mesh."""
-#     # Get the points from the mesh
-#     points = mesh.points
-#     # Apply the deformation
-#     points[:, 2] += deformation_strength * np.sin(deformation_frequency * points[:, 0])
-#     # Update the mesh with the new points
-#     mesh.points = points
-#     return mesh
 
-#image_path = '/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg' 
-image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+image_path = '/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg' 
+#image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
 image = cv2.imread(image_path)
 image_resolution=(image.shape[1], image.shape[0])
 # Generate 3D points for a cylinder
@@ -192,14 +160,3 @@ fig.canvas.mpl_connect('button_press_event', update_cylinder_position)
 
 
 plt.show()
-
-# # Create and deform the cylinder
-# cylinder = create_cylinder(radius=2.0, height=5.0, num_points=100)
-# deformed_cylinder = apply_deformation(cylinder, deformation_strength=2, deformation_frequency=4)
-
-# # Visualization with PyVista
-# plotter = pv.Plotter()
-# plotter.add_mesh(deformed_cylinder, color="lightblue", show_edges=True)
-# plotter.add_floor()
-# plotter.show_grid()
-# plotter.show()
