@@ -71,7 +71,7 @@ class WarpField:
             end_radius = self.radius * 0.9  # Default shrink to 90% of the original radius
 
         points = self.cylinder.points
-        # Extract z-coordinates
+       
         z = points[:, 2]
         
         # Normalize z-coordinates to range [0, 1]
@@ -218,8 +218,6 @@ class Points_Processor:
 
 
 class Project3D_2D:
-   
-
     def __init__(self, camera_matrix):
         """
         Initializes the projector with a camera matrix.
@@ -240,10 +238,6 @@ class Project3D_2D:
                              [0, 0, 1]])
         
         return camera_matrix
-  
-
-    
-
 
     def project_points(self, points_3d):
         """
