@@ -1,54 +1,51 @@
-from utils import *
-import open3d as o3d
 
-''' init warp field instance creation and pcd save'''
-warp_field = WarpField(radius=1.0, height=2.0, vanishing_pts=(0, 0, 10), center=(10, 10, 10), resolution=500)
-warp_field.apply_deformation(strength=0.3, frequency=1)
-warp_field.densify_point_cloud(target_count=2000)
-warp_field.save_point_cloud('deformed_cylinder_point_cloud.txt')
+import cv2
+import numpy as np
+import pyvista as pv
+from utils import WarpField
 
-# # Extract and print the point cloud data
-# point_cloud = warp_field.extract_pcd()
-# #print(point_cloud)  # This will display the 3D points of the deformed cylinder
-# # Optionally, visualize the deformed cylinder using PyVista
-plotter = pv.Plotter()
-plotter.add_mesh(warp_field.cylinder, color='lightblue', show_edges=False)
-plotter.show()
+def main():
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0037.png'
+    image = cv2.imread(image_path)
+    if image is None:
+        print("Error: Image not found.")
+        return
+
+    image_height, image_width = image.shape[:2]
+    image_center = (image_width / 2, image_height / 2, 0)
+    radius = 1
+    height = 10
+    vanishing_pts = (0, 0, 10)
+    center = image_center
+    resolution = 100
+    warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
+
+    # Apply deformation to the cylinder (optional)
+    #warp_field.apply_shrinking(start_radius=3, end_radius=2)
+    #warp_field.apply_deformation(strength=0.1,frequency=1)
+    warp_field.apply_deformation_axis(strength=0.1,frequency=1)
+
+    # Extract points from the cylinder
+    cylinder_points = warp_field.extract_pts()
+
+    # Plot the extracted 3D points from the cylinder's surface using PyVista
+    point_cloud = pv.PolyData(cylinder_points)
+    point_cloud['scalar'] = np.arange(point_cloud.n_points)  
+
+    # Plot the mesh of the 3D cylinder
+    cylinder_mesh = pv.PolyData(cylinder_points, warp_field.cylinder.faces)
+    cylinder_mesh.compute_normals(cell_normals=False, inplace=True)  
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(point_cloud, color='blue', point_size=5, render_points_as_spheres=True, label="Cylinder Points")
+    plotter.add_mesh(cylinder_mesh, color='red', show_edges=True, edge_color='black', line_width=1, label="Cylinder Mesh")
+    plotter.add_legend()
+    plotter.add_title("3D Points and Mesh from Cylinder Surface")
+    plotter.show()
+
+
+  
 
 if __name__ == "__main__":
-    pcd_preparer = PointCloudPreparer(target_num_points=1000, normalize=True) #instance of PointCloudPreparer
-    scene_point_cloud_path = '/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt'
-    def_cyl_path = '/Users/ekole/Dev/gut_slam/pose_estim/deformed_cylinder_point_cloud.txt'
+    main()
 
-    pc1 = pcd_preparer.read_point_cloud_from_txt(def_cyl_path)
-    pc2= pcd_preparer.read_point_cloud_from_txt(scene_point_cloud_path)
-
-    prepared_pc1 = pcd_preparer.prepare(pc1)
-    prepared_pc2 = pcd_preparer.prepare(pc2)
-
-    #visualize the prepared point clouds using Open3D
-    
-    #visualize_point_clouds(prepared_pc1, prepared_pc2)
-    #visualize_point_clouds(prepared_pc1, prepared_pc2)   
-
-    # # Align the source point cloud to the target using ICP
- 
-
-    aligned_source_pc = pcd_preparer.align_point_clouds(prepared_pc1, prepared_pc2, threshold=1.0)
-
-    # Convert the aligned source point cloud back to Open3D PointCloud
-    aligned_source_o3d = o3d.geometry.PointCloud()
-    aligned_source_o3d.points = o3d.utility.Vector3dVector(aligned_source_pc)
-
-    # Convert the prepared target point cloud back to Open3D PointCloud
-    prepared_pc2_o3d = o3d.geometry.PointCloud()
-    prepared_pc2_o3d.points = o3d.utility.Vector3dVector(prepared_pc1)
-
-    # Visualization of the aligned point clouds
-    o3d.visualization.draw_geometries([aligned_source_o3d, prepared_pc2_o3d])
-
-
-
-   
-    
-    

@@ -41,7 +41,8 @@ def update_cylinder(new_center):
     
     # Update the 3D plot for 3D projection
  
-    mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='b', alpha=1)
+    #mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='b', alpha=1)
+    mesh = ax_3d.scatter(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='r', alpha=0.5)
 
     
     ax_3d.set_xlabel('X')
@@ -110,8 +111,8 @@ def project_points_onto_image(points_3d):
 #     return cylinder_points
 
 
-image_path = '/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg' 
-#image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+#image_path = '/Users/ekole/Dev/gut_slam/gut_images/image2.jpeg' 
+image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
 image = cv2.imread(image_path)
 image_resolution=(image.shape[1], image.shape[0])
 # Generate 3D points for a cylinder
@@ -146,7 +147,9 @@ ax_2d.legend()
 ax_3d = fig.add_subplot(122, projection='3d')
 
 # Plot the cylinder as a mesh
-mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='r', alpha=0.7)
+#mesh = ax_3d.plot_trisurf(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='r', alpha=0.5)
+mesh = ax_3d.scatter(cylinder_points[:, 0], cylinder_points[:, 1], cylinder_points[:, 2], color='r', alpha=0.5)
+
 
 ax_3d.set_xlabel('X')
 ax_3d.set_ylabel('Y')
