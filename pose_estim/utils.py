@@ -32,36 +32,84 @@ class WarpField:
         cylinder = pv.Cylinder(radius=self.radius, height=self.height, direction=direction, center=self.center, resolution=self.resolution)
         return cylinder
 
-    def apply_deformation(self, strength=0.1, frequency=1):
+    def apply_deformation_axis(self, strength=0.1, frequency=1):
         'Apply non-rigid deformation to the cylinder mesh'
         # Get the points of the cylinder mesh
         points = self.cylinder.points
-        points[:,0]+=strength*np.sin(frequency*points[:,0])
+        points[:,0]+=strength*np.sin(frequency*points[:,0]) #apply deformation to x,y,z
         points[:,1]+=strength*np.cos(frequency*points[:,1])
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
-
-    def extract_pcd(self):
-        'Extract point cloud from the cylinder mesh'
-        pcd = self.cylinder.points
-        return pcd
-    def save_point_cloud(self, filename):
+    
+    def apply_deformation(self, strength=0.1, frequency=1):
+        # Get the points of the cylinder mesh
+        points = self.cylinder.points
+        # Convert to cylindrical coordinates (r, phi, z)
+        x, y, z = points[:, 0], points[:, 1], points[:, 2]
+        r = np.sqrt(x**2 + y**2)
+        phi = np.arctan2(y, x)
+        # Apply a twist deformation as a function of height (z)
+        twist_phi = phi + strength * np.sin(frequency * z)
+        # Convert back to Cartesian coordinates, keeping r constant to preserve the radius
+        points[:, 0] = r * np.cos(twist_phi)
+        points[:, 1] = r * np.sin(twist_phi)
+        # Update the cylinder points
+        self.cylinder.points = points
+    
+    def apply_shrinking(self, start_radius=None, end_radius=None):
         """
-        Save the point cloud data of the deformable mesh to a text file.
+        Apply a linear shrinking deformation along the length of the cylinder.
 
         Parameters:
-        - filename: The name of the file where the point cloud data will be saved.
+        - start_radius: The radius at the base of the cylinder. If None, uses the original radius.
+        - end_radius: The desired radius at the top of the cylinder. If None, slightly less than the start_radius.
         """
-        point_cloud = self.extract_pcd()
-        np.savetxt(filename, point_cloud, delimiter=',')
+        # If no radii are provided, use the cylinder's current radius and a slightly smaller value for the end_radius
+        if start_radius is None:
+            start_radius = self.radius
+        if end_radius is None:
+            end_radius = self.radius * 0.9  # Default shrink to 90% of the original radius
 
-    def densify_point_cloud(self, target_count):
+        points = self.cylinder.points
+       
+        z = points[:, 2]
+        
+        # Normalize z-coordinates to range [0, 1]
+        z_normalized = (z - z.min()) / (z.max() - z.min())
+        
+        # Linear interpolation between start_radius and end_radius based on z position
+        new_radii = start_radius * (1 - z_normalized) + end_radius * z_normalized
+        
+        # Convert Cartesian (x, y, z) to cylindrical (r, phi, z) coordinates
+        r = np.sqrt(points[:, 0]**2 + points[:, 1]**2)
+        phi = np.arctan2(points[:, 1], points[:, 0])
+        
+        # Adjust r according to new_radii
+        r_shrunk = r / r.max() * new_radii
+        
+        # Convert back to Cartesian coordinates
+        points[:, 0] = r_shrunk * np.cos(phi)
+        points[:, 1] = r_shrunk * np.sin(phi)
+        
+        # Update the cylinder points
+        self.cylinder.points = points
+
+
+    def extract_pts(self):
+        pcd = self.cylinder.points
+        return pcd
+    
+    def save_pts(self, filename):
+        points = self.extract_pts()
+        np.savetxt(filename, points, delimiter=',')
+
+    def densify_pts(self, target_count):
         """
         Densify the cylinder's point cloud to a specified target count.
         This method interpolates new points to increase the density of the point cloud.
         """
         # Extract current point cloud
-        points = self.extract_pcd()
+        points = self.extract_pts()
 
        
         # Calculate factor to increase the number of points
@@ -71,8 +119,8 @@ class WarpField:
         # Initialize new points array
         densified_points = np.empty((0, 3), dtype=np.float64)
 
-        # Simple densification: repeat each point 'factor' times
-        # Note: This is a placeholder. For actual densification, consider interpolating between points
+        # Simple densification: repeat each point 'factor' times ~alternative: linear interpolation
+        
         for point in points:
             repeated_points = np.tile(point, (factor, 1))
             densified_points = np.vstack((densified_points, repeated_points))
@@ -81,10 +129,10 @@ class WarpField:
         self.cylinder.points = densified_points[:target_count]
     
     
-class PointCloudPreparer:
+class Points_Processor:
     def __init__(self, target_num_points=None, normalize=False):
         """
-        Initialize the PointCloudPreparer.
+        Initialize the PointProcessor.
 
         Parameters:
         - target_num_points: The target number of points for downsampling. If None, downsampling is not performed.
@@ -93,7 +141,7 @@ class PointCloudPreparer:
         self.target_num_points = target_num_points
         self.normalize = normalize
     
-    def read_point_cloud_from_txt(self, file_path):
+    def read_point_from_txt(self, file_path):
         """
         Reads a point cloud from a text file, attempting to automatically detect the delimiter.
 
@@ -130,21 +178,17 @@ class PointCloudPreparer:
     def prepare(self, pc):
         """
         Apply downsampling and normalization to the point cloud based on the initialization parameters.
-
-        Parameters:
-        - pc: The point cloud as a NumPy array.
-
-        Returns:
-        - The prepared point cloud as a NumPy array.
         """
         pc = self.downsample(pc)
         if self.normalize:
             pc = self.normalize_points(pc)
         return pc
     
-    def align_point_clouds(self, source_pc, target_pc, threshold=1.0):
+    
+    
+    def align_points(self, source_pc, target_pc, threshold=1.0):  #optional method
         """
-        Align two point clouds using the ICP algorithm.
+        Align two 3D points  using the ICP algorithm.
 
         Parameters:
         - source_pc: The source point cloud as a NumPy array.
@@ -172,24 +216,58 @@ class PointCloudPreparer:
         # Return the aligned point cloud as a numpy array
         return np.asarray(target.points)
 
+
+class Project3D_2D:
+    def __init__(self, camera_matrix):
+        """
+        Initializes the projector with a camera matrix.
+
+        Parameters:
+        - camera_matrix: A 3x4 matrix representing the intrinsic and extrinsic camera parameters.
+        """
+        self.camera_matrix = np.array(camera_matrix)
     
-def visualize_point_clouds(pc1, pc2):
-    """
-    Visualizes two point clouds using Open3D.
+    def get_camera_parameters(image_height, image_width):
+        fx=735.37
+        fy=552.0
+        cx=image_height/2
+        cy=image_width/2
 
-    Parameters:
-    - pc1: The first point cloud as a NumPy array.
-    - pc2: The second point cloud as a NumPy array.
-    """
-    # Convert the NumPy arrays to Open3D point cloud objects
-    pcd1 = o3d.geometry.PointCloud()
-    pcd1.points = o3d.utility.Vector3dVector(pc1)
-    pcd1.paint_uniform_color([1, 0, 0])  # Red color for the first point cloud
+        camera_matrix=np.array([[fx, 0, cx],
+                             [0, fy, cy],
+                             [0, 0, 1]])
+        
+        return camera_matrix
 
-    pcd2 = o3d.geometry.PointCloud()
-    pcd2.points = o3d.utility.Vector3dVector(pc2)
-    pcd2.paint_uniform_color([0, 0, 1])  # Blue color for the second point cloud
+    def project_points(self, points_3d):
+        """
+        Projects 3D points to 2D using the camera matrix and homogeneous coordinates.
 
-    #visualize the prepared point clouds using Open3D
-    o3d.visualization.draw_geometries([pcd1, pcd2])
+        Parameters:
+        - points_3d: A Nx3 numpy array of 3D points.
+
+        Returns:
+        - A Nx2 numpy array of 2D projected points.
+        """
+        num_points = points_3d.shape[0]
+       
+        homogeneous_3d = np.hstack((points_3d, np.ones((num_points, 1))))
+        homogeneous_3d=homogeneous_3d[:,:3]
+        
+        # Project the points using the camera matrix
+        #points_2d_homogeneous = np.dot(self.camera_matrix, homogeneous_3d.T).T
+        points_2d_homogeneous=np.dot(homogeneous_3d,self.camera_matrix)
+
+         # Check for division by zero
+        mask = (points_2d_homogeneous[:, 2] != 0)
+        
+        # Convert from homogeneous coordinates to 2D
+        #points_2d = points_2d_homogeneous[:, :2] / points_2d_homogeneous[:, [2]]
+        points_2d = np.empty_like(points_2d_homogeneous[:, :2])
+        points_2d[mask] = points_2d_homogeneous[mask, :2] / points_2d_homogeneous[mask, 2:]
+        points_2d[~mask] = np.nan
+        
+        return points_2d
+
+    
 
