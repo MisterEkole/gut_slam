@@ -14,7 +14,7 @@ def main():
     image_center = (image_width / 2, image_height / 2, 0)
     radius = 1
     height = 10
-    vanishing_pts = (0, 0, 2)
+    vanishing_pts = (0, 0, 10)
     center = image_center
     resolution = 100
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
@@ -22,7 +22,7 @@ def main():
     # Apply deformation to the cylinder (optional)
     #warp_field.apply_shrinking(start_radius=None, end_radius=None)
     #warp_field.apply_deformation(strength=0.1,frequency=1)
-    warp_field.apply_deformation_axis(strength=2,frequency=3)
+    warp_field.apply_deformation_axis(strength=0.5,frequency=1)
 
     # Extract points from the cylinder
     cylinder_points = warp_field.extract_pts()
