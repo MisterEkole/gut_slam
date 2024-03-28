@@ -1,45 +1,80 @@
 import cv2
 import numpy as np
 import pyvista as pv
-from utils import WarpField
+from utils import *
+import matplotlib.pyplot as plt
 
 def main():
     image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0037.png'
     image = cv2.imread(image_path)
+    
     if image is None:
         print("Error: Image not found.")
         return
 
     image_height, image_width = image.shape[:2]
     image_center = (image_width / 2, image_height / 2, 0)
-    radius = 1
-    height = 10
-    vanishing_pts = (0, 0, 2)
+    radius = 500  # in mm  use approriate measuements along with appropriate camera parameters to match scaling and projection
+    height = 1000
+    vanishing_pts = (0, 0, 10)
     center = image_center
     resolution = 100
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
 
+
+    # intrinsic_matrix = np.array([[735.37, 0, image_height/2],
+    #                          [0, 552.0, image_width/2],
+    #                          [0, 0, 1]])
+
+    rot_mat = np.array([[1, 0, 0],   
+                            [0, 1, 0],
+                            [0, 0, 1]])
+
+    trans_mat = np.array([1, 1, 1]) 
+
+    
+
+
+    intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(
+    image_height, image_width, rot_mat, trans_mat)
+
+    projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
+
+
+    # camera_matrix = Project3D_2D.get_camera_parameters(image_height, image_width)
+    # projector = Project3D_2D(camera_matrix)
+
     # Apply deformation to the cylinder (optional)
     #warp_field.apply_shrinking(start_radius=None, end_radius=None)
     #warp_field.apply_deformation(strength=0.1,frequency=1)
-    warp_field.apply_deformation_axis(strength=2,frequency=3)
+    warp_field.apply_deformation_axis(strength=5,frequency=10)
+    
 
     # Extract points from the cylinder
     cylinder_points = warp_field.extract_pts()
 
-    # Plot the extracted 3D points from the cylinder's surface using PyVista
-    point_cloud = pv.PolyData(cylinder_points)
-    point_cloud['scalar'] = np.arange(point_cloud.n_points)  
+    projected_pts=projector.project_points(points_3d=cylinder_points)
 
-    # Plot the mesh of the 3D cylinder
-    cylinder_mesh = pv.PolyData(cylinder_points, warp_field.cylinder.faces)
-    cylinder_mesh.compute_normals(cell_normals=False, inplace=True)  
+    #print(projected_pts)
+
+  
+
+    plt.imshow(image)
+    plt.xlim(0, image.shape[1])
+    plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
+    plt.scatter(projected_pts[:, 0], projected_pts[:, 1], color='red', s=10)  # Increased size for visibility
+    plt.show()
+
+
+    # plt.imshow(image)
+    # plt.scatter([image.shape[1] / 2], [image.shape[0] / 2], color='red', s=10)  # Center of the image
+    # plt.show()
+
+    #plot 3D cylinder
 
     plotter = pv.Plotter()
-    plotter.add_mesh(point_cloud, color='blue', point_size=5, render_points_as_spheres=True, label="Cylinder Points")
-    plotter.add_mesh(cylinder_mesh, color='red', show_edges=True, edge_color='black', line_width=1, label="Cylinder Mesh")
-    plotter.add_legend()
-    plotter.add_title("3D Points and Mesh from Cylinder Surface")
+    plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
+    plotter.add_title("Deformable Cylinder Visualization")
     plotter.show()
 
 
