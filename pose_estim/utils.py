@@ -226,7 +226,7 @@ class Project3D_2D:
         - camera_matrix: A 3x4 matrix representing the intrinsic and extrinsic camera parameters.
         """
         self.camera_matrix = np.array(camera_matrix)
-    
+    @staticmethod
     def get_camera_parameters(image_height, image_width):
         fx=735.37
         fy=552.0
@@ -239,7 +239,7 @@ class Project3D_2D:
         
         return camera_matrix
 
-    def project_points(self, points_3d):
+    def project_points(self,points_3d):
         """
         Projects 3D points to 2D using the camera matrix and homogeneous coordinates.
 
@@ -252,11 +252,11 @@ class Project3D_2D:
         num_points = points_3d.shape[0]
        
         homogeneous_3d = np.hstack((points_3d, np.ones((num_points, 1))))
-        homogeneous_3d=homogeneous_3d[:,:3]
+        #homogeneous_3d=homogeneous_3d[:,:3]
         
         # Project the points using the camera matrix
         #points_2d_homogeneous = np.dot(self.camera_matrix, homogeneous_3d.T).T
-        points_2d_homogeneous=np.dot(homogeneous_3d,self.camera_matrix)
+        points_2d_homogeneous=np.dot(self.camera_matrix,homogeneous_3d.T)
 
          # Check for division by zero
         mask = (points_2d_homogeneous[:, 2] != 0)
@@ -268,6 +268,67 @@ class Project3D_2D:
         points_2d[~mask] = np.nan
         
         return points_2d
-
     
 
+
+class Project3D_2D_cam:
+    def __init__(self, intrinsic_matrix, rotation_matrix, translation_vector):
+        """
+        Initializes the projector with camera intrinsic and extrinsic parameters.
+
+        Parameters:
+        - intrinsic_matrix: A 3x3 numpy array representing the intrinsic camera parameters.
+        - rotation_matrix: A 3x3 numpy array representing the rotation part of the extrinsic parameters.
+        - translation_vector: A 3x1 numpy array representing the translation part of the extrinsic parameters.
+        """
+        self.intrinsic_matrix = np.array(intrinsic_matrix)
+        self.rotation_matrix = np.array(rotation_matrix)
+        self.translation_vector = np.array(translation_vector).reshape(3, 1)
+
+    def project_points(self, points_3d):
+        num_points = points_3d.shape[0]
+        # Convert points to homogeneous coordinates for extrinsic transformation
+        homogeneous_3d = np.hstack((points_3d, np.ones((num_points, 1))))
+
+        # Apply extrinsic parameters (rotation and translation)
+        camera_coords = (self.rotation_matrix @ homogeneous_3d[:, :3].T + self.translation_vector).T
+
+        # Apply intrinsic parameters (note: only take the X, Y, Z without the homogeneous '1')
+        image_points_homogeneous = (self.intrinsic_matrix @ camera_coords.T).T  # Use camera_coords directly
+
+        # Normalize by the third (z) coordinate to project onto the image plane
+        points_2d = image_points_homogeneous[:, :2] / image_points_homogeneous[:, [2]]
+
+        return points_2d
+    @staticmethod
+    def get_camera_parameters(image_height, image_width, rotation_vector, translation_vector):
+        """
+        Generates camera intrinsic matrix and sets rotation and translation vectors for extrinsic parameters.
+
+        Parameters:
+        - image_height: Height of the image or sensor.
+        - image_width: Width of the image or sensor.
+        - rotation_vector: A 3x1 or 1x3 numpy array representing the rotation part of the extrinsic parameters.
+        - translation_vector: A 3x1 or 1x3 numpy array representing the translation part of the extrinsic parameters.
+
+        Returns:
+        - intrinsic_matrix: A 3x3 numpy array of the intrinsic camera parameters.
+        - rotation_matrix: A 3x3 numpy array representing the rotation matrix derived from the rotation vector.
+        - translation_vector: A 3x1 numpy array of the translation part of the extrinsic parameters.
+        """
+        #fx = 200
+        #fx = image_width / (2 * np.tan(90 / 2 * np.pi / 180))
+        fx=2.22*(image_width/36)
+        fy = fx
+        cx = image_width / 2
+        cy = image_height / 2
+
+        intrinsic_matrix = np.array([[fx, 0, cx],
+                                     [0, fy, cy],
+                                     [0, 0, 1]])
+        
+        # Assuming rotation_vector is already in the form of a rotation matrix or can be converted to one
+        rotation_matrix = np.array(rotation_vector).reshape(3, 3)
+        translation_matrix = np.array(translation_vector).reshape(3, 1)
+
+        return intrinsic_matrix, rotation_matrix, translation_matrix
