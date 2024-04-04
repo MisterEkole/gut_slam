@@ -9,6 +9,7 @@ from scipy.optimize import least_squares
 from utils import WarpField, Project3D_2D_cam, calib_p_model, cost_func, get_pixel_intensity, reg_func
 import matplotlib.pyplot as plt
 import os
+import time
 
 
 # Function to load frames from a video file
@@ -85,7 +86,7 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
     result = least_squares(objective_function, 
                            initial_params,
                          args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-                         method='lm', max_nfev=1000, gtol=1e-6)
+                         method='lm', max_nfev=1000, gtol=1e-8)
     return result.x
 
 
@@ -96,8 +97,10 @@ def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, ga
 
 def main():
     #frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S1'
+    start_time=time.time()
     frames_directory = '/Users/ekole/Dev/gut_slam/gut_images'
     frames = load_frames_from_directory(frames_directory)
+    total_optim_time = 0
     
     # Assuming the first frame's parameters are applicable as the starting point for the next frames
     for frame_idx, image in enumerate(frames):
@@ -108,6 +111,8 @@ def main():
         vanishing_pts = (0, 0, 10)
         center = image_center
         resolution = 100
+
+        
 
         # Initialize or update warp field for each frame
         warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
@@ -143,18 +148,35 @@ def main():
             initial_deformation_frequency = optimized_deformation_frequency
 
         initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), initial_deformation_strength, initial_deformation_frequency])
-        
+        optim_start_time = time.time()
         optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field)
+
+        optim_end_time = time.time()
+
+        optim_time=optim_end_time-optim_start_time
+        total_optim_time += optim_time
 
         optimized_deformation_strength = optimized_params[12]
         optimized_deformation_frequency = optimized_params[13]
 
+        # plt.imshow(image)
+        # plt.xlim(0, image.shape[1])
+        # plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
+        # plt.scatter(points_2d_observed[:, 0], points_2d_observed[:, 1], color='red', s=10)  # Increased size for visibility
+        # plt.title(f"Frame {frame_idx}")
+        # plt.show()
+
         # Optional: Visualize or process the optimized results for each frame
+        print(f"Optimization time for frame {frame_idx}: {optim_time:.2f} seconds")
+
         print(f"Frame {frame_idx}: Optimized Parameters:")
         print("Optimized Rotation Vector: \n", optimized_params[:9].reshape(3, 3))
         print("Optimized Translation Vector: \n", optimized_params[9:12])
         print("Optimized Deformation Strength: ", optimized_deformation_strength)
         print("Optimized Deformation Frequency: ", optimized_deformation_frequency)
+    end_time=time.time()
+    total_time=end_time-start_time
+    print(f"Total execution time: {total_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()
