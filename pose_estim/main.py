@@ -5,12 +5,15 @@ from utils import *
 import matplotlib.pyplot as plt
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0037.png'
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
     image = cv2.imread(image_path)
     
     if image is None:
         print("Error: Image not found.")
         return
+    
+
+
 
     image_height, image_width = image.shape[:2]
     image_center = (image_width / 2, image_height / 2, 0)
@@ -20,6 +23,7 @@ def main():
     center = image_center
     resolution = 100
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
+   
 
 
     # intrinsic_matrix = np.array([[735.37, 0, image_height/2],
@@ -30,7 +34,7 @@ def main():
                             [0, 1, 0],
                             [0, 0, 1]])
 
-    trans_mat = np.array([1, 1, 1]) 
+    trans_mat = np.array([0, 0, 0]) 
 
     
 
@@ -52,10 +56,32 @@ def main():
 
     # Extract points from the cylinder
     cylinder_points = warp_field.extract_pts()
+    print(cylinder_points)
 
     projected_pts=projector.project_points(points_3d=cylinder_points)
 
     #print(projected_pts)
+    print(warp_field.cylinder.points)
+    k=2.5
+    g_t=2.0
+    gamma=2.2
+
+    #precompute values for cylinder points and image points before doing the photometric projection
+
+
+    # for point in cylinder_points:
+    #     for row in range(image.shape[0]):
+    #         for col in range(image.shape[1]):
+    #             u = image[row, col]
+    #             x,y,z=point
+    #             L=calib_p_model(x,y,z,k,g_t,gamma)
+    #             I=get_pixel_intensity(u)
+    #             C=cost_func(I,L)
+    #             print("Pixel intensity: ",I, "Cost function: ",C, "Light intensity: ",L)
+      
+       
+ 
+
 
   
 
@@ -72,10 +98,12 @@ def main():
 
     #plot 3D cylinder
 
-    plotter = pv.Plotter()
-    plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
-    plotter.add_title("Deformable Cylinder Visualization")
-    plotter.show()
+    # plotter = pv.Plotter()
+    # plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
+    # plotter.add_title("Deformable Cylinder Visualization")
+    # plotter.show()
+
+    #display_point_cloud(cylinder_points)
 
 
   

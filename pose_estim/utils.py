@@ -6,6 +6,7 @@ Date: 16-03-2024
 import numpy as np
 import open3d as o3d
 import pyvista as pv
+from scipy.optimize import least_squares
 
 class WarpField:
     """
@@ -41,6 +42,7 @@ class WarpField:
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
     
+    @staticmethod
     def apply_deformation(self, strength=0.1, frequency=1):
         # Get the points of the cylinder mesh
         points = self.cylinder.points
@@ -228,8 +230,9 @@ class Project3D_2D:
         self.camera_matrix = np.array(camera_matrix)
     @staticmethod
     def get_camera_parameters(image_height, image_width):
-        fx=735.37
-        fy=552.0
+        fx=2.22*(image_width/36)
+        #fx=735.37
+        fy=fx
         cx=image_height/2
         cy=image_width/2
 
@@ -252,11 +255,12 @@ class Project3D_2D:
         num_points = points_3d.shape[0]
        
         homogeneous_3d = np.hstack((points_3d, np.ones((num_points, 1))))
-        #homogeneous_3d=homogeneous_3d[:,:3]
+        homogeneous_3d=homogeneous_3d[:,:3]
         
         # Project the points using the camera matrix
         #points_2d_homogeneous = np.dot(self.camera_matrix, homogeneous_3d.T).T
-        points_2d_homogeneous=np.dot(self.camera_matrix,homogeneous_3d.T)
+        #points_2d_homogeneous=np.dot(self.camera_matrix,homogeneous_3d.T)
+        points_2d_homogeneous=np.dot(homogeneous_3d,self.camera_matrix.T)
 
          # Check for division by zero
         mask = (points_2d_homogeneous[:, 2] != 0)
@@ -304,17 +308,6 @@ class Project3D_2D_cam:
     def get_camera_parameters(image_height, image_width, rotation_vector, translation_vector):
         """
         Generates camera intrinsic matrix and sets rotation and translation vectors for extrinsic parameters.
-
-        Parameters:
-        - image_height: Height of the image or sensor.
-        - image_width: Width of the image or sensor.
-        - rotation_vector: A 3x1 or 1x3 numpy array representing the rotation part of the extrinsic parameters.
-        - translation_vector: A 3x1 or 1x3 numpy array representing the translation part of the extrinsic parameters.
-
-        Returns:
-        - intrinsic_matrix: A 3x3 numpy array of the intrinsic camera parameters.
-        - rotation_matrix: A 3x3 numpy array representing the rotation matrix derived from the rotation vector.
-        - translation_vector: A 3x1 numpy array of the translation part of the extrinsic parameters.
         """
         #fx = 200
         #fx = image_width / (2 * np.tan(90 / 2 * np.pi / 180))
@@ -332,3 +325,59 @@ class Project3D_2D_cam:
         translation_matrix = np.array(translation_vector).reshape(3, 1)
 
         return intrinsic_matrix, rotation_matrix, translation_matrix
+
+
+# =============================================================================
+# =============================================================================
+# Utils functions for Photometric model
+# =============================================================================
+# =============================================================================
+
+def light_spread_func(x,k):
+    return np.power(np.abs(x),k)
+
+def calib_p_model(x,y,z,k,g_t,gamma):
+    ''' Computes Ical based on calib model'''
+    mu=light_spread_func(z,k)
+    fr_thetha=1/np.pi
+    cent_to_pix=np.linalg.norm(np.array([x,y,z]))
+    thetha=2*(np.arccos(np.linalg.norm(np.array([x,y]))/cent_to_pix))/np.pi
+    L=(mu/cent_to_pix)*fr_thetha*np.cos(thetha)*g_t
+    L=np.power(np.abs(L),gamma)
+    return L
+
+def cost_func(I,L,sigma=1e-3):
+    '''Computes the cost function for the photometric model'''
+    if np.linalg.norm(I-L)<sigma:
+        norm=np.linalg.norm(I-L)/(2*sigma)
+    else:
+        norm=np.abs(I-L)+(sigma/2)
+    return norm  #return photometric error
+
+def reg_func(grad,sigma=1e-3):
+    '''Computes the regularization function for the photometric model'''
+    g=np.exp(-np.linalg.norm(grad))
+    if np.linalg.norm(grad)<sigma:
+        norm=np.power(np.linalg.norm(grad),2)/(2*sigma)
+    else:
+        norm=np.abs(grad)+(sigma/2)
+    return g*norm
+
+def get_pixel_intensity(pixel):
+    '''Computes the intensity of a pixel'''
+    r,g,b=pixel
+    return (float(r)+float(g)+float(b))/(255*3)
+
+
+
+# =============================================================================
+# =============================================================================
+# Utils for bundle adjustment
+# =============================================================================
+# =============================================================================
+# =============================================================================
+def reprojection_error(projected_2d_pts, points_2d):
+    ''' Compute reprojection error between projected points and observed points'''
+    geodesic_error = np.linalg.norm(projected_2d_pts - points_2d)**2
+    return geodesic_error
+
