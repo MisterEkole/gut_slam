@@ -6,6 +6,7 @@ Date: 16-03-2024
 import numpy as np
 import open3d as o3d
 import pyvista as pv
+from scipy.optimize import least_squares
 
 class WarpField:
     """
@@ -41,6 +42,7 @@ class WarpField:
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
     
+    @staticmethod
     def apply_deformation(self, strength=0.1, frequency=1):
         # Get the points of the cylinder mesh
         points = self.cylinder.points
@@ -306,17 +308,6 @@ class Project3D_2D_cam:
     def get_camera_parameters(image_height, image_width, rotation_vector, translation_vector):
         """
         Generates camera intrinsic matrix and sets rotation and translation vectors for extrinsic parameters.
-
-        Parameters:
-        - image_height: Height of the image or sensor.
-        - image_width: Width of the image or sensor.
-        - rotation_vector: A 3x1 or 1x3 numpy array representing the rotation part of the extrinsic parameters.
-        - translation_vector: A 3x1 or 1x3 numpy array representing the translation part of the extrinsic parameters.
-
-        Returns:
-        - intrinsic_matrix: A 3x3 numpy array of the intrinsic camera parameters.
-        - rotation_matrix: A 3x3 numpy array representing the rotation matrix derived from the rotation vector.
-        - translation_vector: A 3x1 numpy array of the translation part of the extrinsic parameters.
         """
         #fx = 200
         #fx = image_width / (2 * np.tan(90 / 2 * np.pi / 180))
@@ -361,7 +352,7 @@ def cost_func(I,L,sigma=1e-3):
         norm=np.linalg.norm(I-L)/(2*sigma)
     else:
         norm=np.abs(I-L)+(sigma/2)
-    return norm
+    return norm  #return photometric error
 
 def reg_func(grad,sigma=1e-3):
     '''Computes the regularization function for the photometric model'''
@@ -376,3 +367,17 @@ def get_pixel_intensity(pixel):
     '''Computes the intensity of a pixel'''
     r,g,b=pixel
     return (float(r)+float(g)+float(b))/(255*3)
+
+
+
+# =============================================================================
+# =============================================================================
+# Utils for bundle adjustment
+# =============================================================================
+# =============================================================================
+# =============================================================================
+def reprojection_error(projected_2d_pts, points_2d):
+    ''' Compute reprojection error between projected points and observed points'''
+    geodesic_error = np.linalg.norm(projected_2d_pts - points_2d)**2
+    return geodesic_error
+
