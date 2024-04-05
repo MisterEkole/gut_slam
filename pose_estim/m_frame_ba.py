@@ -6,7 +6,7 @@ Date: 04-04-2024
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
-from utils import WarpField, Project3D_2D_cam, calib_p_model, cost_func, get_pixel_intensity, reg_func
+from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, cost_func, get_pixel_intensity, reg_func
 import matplotlib.pyplot as plt
 import os
 import time
@@ -43,6 +43,18 @@ def load_frames_from_directory(directory_path):
             print(f"Warning: Could not read image {image_file}")
 
     return frames
+
+def rotation_matrix_to_vector(rotation_matrix):
+    """
+    Convert a rotation matrix to a rotation vector using Rodrigues' formula.
+    
+    :param rotation_matrix: A 3x3 rotation matrix.
+    :return: A rotation vector where the direction represents the axis of rotation
+             and the magnitude represents the angle of rotation in radians.
+    """
+    rotation_vector, _ = cv2.Rodrigues(rotation_matrix)
+    return rotation_vector
+
 def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field):
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
@@ -55,6 +67,13 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     projected_2d_pts = projector.project_points(points_3d_deformed)
+    # Resize projected_2d_pts to match points_2d_observed
+    if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
+        projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
+    elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
+        points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
+    
+        
     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
     lamda_reg = 1.0
     
@@ -62,17 +81,19 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
         x, y, z = pt3d
         L = calib_p_model(x, y, z, k, g_t, gamma)
-        if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:  
+        if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:  #check if pts2d is within boundary of image, then proceed to compute pixel intensity
             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
             C = cost_func(pixel_intensity, L)
         else:
             C = 0 
         grad=np.ones((projected_2d_pts.shape[0],))
         reg=reg_func(grad)
-        photometric_error.append(C+lamda_reg*reg)
-    photometric_error = np.array(photometric_error)
+        
+        photometric_error.append(C)
+    photometric_error = np.array(photometric_error+lamda_reg*reg)
 
     errors = np.concatenate([reprojection_error, photometric_error.flatten()])
+    
     def normalize_errors(errors, target_scale=100):
         mean_error = np.mean(errors)
         scale_factor = target_scale / mean_error if mean_error else 1
@@ -80,6 +101,8 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
         return normalized_errors #outputs a normalised error array
     normalize_errors=normalize_errors(errors, target_scale=100)
     #print(" The error is : ", np.mean(normalize_errors)) 
+    print("Photometric error: ", np.mean(photometric_error))
+    print("Reprojection error: ", np.mean(reprojection_error))
     return normalize_errors  #outputs the mean error of the normalised error array
 
 def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field):
@@ -94,6 +117,11 @@ def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, ga
     points_2d_observed = Project3D_2D_cam(intrinsic_matrix, initial_params[:9].reshape(3, 3), initial_params[9:12]).project_points(points_3d)
     optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field)
     return optimized_params
+def detect_feature_points(image):
+    orb = cv2.ORB_create()
+    kp=orb.detect(image,None)
+    kp=cv2.KeyPoint_convert(kp)
+    return kp
 
 def main():
     #frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S1'
@@ -112,6 +140,8 @@ def main():
         center = image_center
         resolution = 100
 
+        points_2d_observed=detect_feature_points(image)
+
         
 
         # Initialize or update warp field for each frame
@@ -125,6 +155,9 @@ def main():
         if frame_idx == 0:
             # Random initialization for the first frame
             rot_mat = np.random.rand(3, 3)
+            #rot_mat = np.array([[1, 0, 0],   
+                            #[0, 1, 0],
+                            #[0, 0, 1]])
             trans_mat = np.random.rand(3)
         else:
             # Use the optimized parameters from the previous frame for initialization
@@ -134,7 +167,7 @@ def main():
         intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat)
         
         cylinder_points = warp_field.extract_pts()
-        points_2d_observed = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector).project_points(cylinder_points)
+        #points_2d_observed = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector).project_points(cylinder_points)
 
         k = 2.5
         g_t = 2.0
@@ -166,11 +199,11 @@ def main():
         # plt.title(f"Frame {frame_idx}")
         # plt.show()
 
-        # Optional: Visualize or process the optimized results for each frame
+        # Optional: Visualize  the optimized results for each frame
         print(f"Optimization time for frame {frame_idx}: {optim_time:.2f} seconds")
 
         print(f"Frame {frame_idx}: Optimized Parameters:")
-        print("Optimized Rotation Vector: \n", optimized_params[:9].reshape(3, 3))
+        print("Optimized Rotation Vector: \n", rotation_matrix_to_vector(optimized_params[:9].reshape(3, 3)))
         print("Optimized Translation Vector: \n", optimized_params[9:12])
         print("Optimized Deformation Strength: ", optimized_deformation_strength)
         print("Optimized Deformation Frequency: ", optimized_deformation_frequency)
