@@ -381,3 +381,26 @@ def reprojection_error(projected_2d_pts, points_2d):
     geodesic_error = np.linalg.norm(projected_2d_pts - points_2d)**2
     return geodesic_error
 
+
+''' euler angles to rot_matrix)'''
+
+def euler_to_rot_mat(yaw, pitch, roll):
+    Rz_yaw = np.array([
+        [np.cos(yaw), -np.sin(yaw), 0],
+        [np.sin(yaw), np.cos(yaw), 0],
+        [0, 0, 1]
+    ])
+    Ry_pitch = np.array([
+        [np.cos(pitch), 0, np.sin(pitch)],
+        [0, 1, 0],
+        [-np.sin(pitch), 0, np.cos(pitch)]
+    ])
+    Rx_roll = np.array([
+        [1, 0, 0],
+        [0, np.cos(roll), -np.sin(roll)],
+        [0, np.sin(roll), np.cos(roll)]
+    ])
+   
+    rot_mat = Rz_yaw @ Ry_pitch @ Rx_roll #xyz order
+    return rot_mat
+
