@@ -29,10 +29,14 @@ def load_frames_from_video(video_path):
     cap.release()  # Release the video capture object
     return frames
 
+
 # Function to load frames from a directory of images
 def load_frames_from_directory(directory_path):
     frames = []
-    image_files = sorted([f for f in os.listdir(directory_path) if os.path.isfile(os.path.join(directory_path, f))])
+    # List of image file extensions that are commonly used
+    valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
+    # Filter files in the directory to include only those with the above extensions
+    image_files = sorted([f for f in os.listdir(directory_path) if f.lower().endswith(valid_extensions) and os.path.isfile(os.path.join(directory_path, f))])
 
     for image_file in image_files:
         image_path = os.path.join(directory_path, image_file)
@@ -70,7 +74,6 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     projected_2d_pts = projector.project_points(points_3d_deformed)
-    #print("Before error line:", type(points_2d_observed), points_2d_observed.shape)
 
     # Resize projected_2d_pts to match points_2d_observed
     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
@@ -78,51 +81,40 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
     
-        
-    reprojection_error = (np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1))/100
-    lamda_reg = 1.0
+    points_2d_observed = points_2d_observed.reshape(-1, 2)
     
+    # Compute reprojection error
+    reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
+    
+    # Compute photometric error
     photometric_error = []
     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
         x, y, z = pt3d
         L = calib_p_model(x, y, z, k, g_t, gamma)
-        if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:  #check if pts2d is within boundary of image, then proceed to compute pixel intensity
+        if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:  # Check if pt2d is within image boundary
             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
             C = cost_func(pixel_intensity, L)
         else:
-            C = 0 
-        grad=np.ones((projected_2d_pts.shape[0],))
-        reg=reg_func(grad)
-        
-        photometric_error.append(C)
-    photometric_error = np.array(photometric_error+lamda_reg*reg)
+            C = 0
+        photometric_error.append(float(C))
+    photometric_error = np.array(photometric_error, dtype=float)
 
+    # Normalize each error type to the same scale
+    reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
+    photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
 
-    ''' adding rotation matrix constraints'''
-    #Orthogonality constraint
-    ortho_pen_scale=10
-    ortho_penalty = ortho_pen_scale * np.linalg.norm(np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3))
-    ortho_penalty*=ortho_pen_scale
+    # Compute rotation matrix constraints (penalties)
+    ortho_penalty = 10 * np.linalg.norm(np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3))
+    det_penalty = 10 * (abs(np.linalg.det(rotation_matrix) - 1) ** 2)
 
-    #derterminant constraint
-    det_pen_scale=10
-    det_penalty = det_pen_scale * ((np.linalg.det(rotation_matrix) - 1)**2)
-    det_penalty*=det_pen_scale
+    # Normalize penalties
+    total_penalty = ortho_penalty + det_penalty
+    total_penalty /= (total_penalty + 1e-8)
 
-    errors = np.concatenate([reprojection_error, photometric_error.flatten()])
-    errors=np.append(errors, [ortho_penalty, det_penalty])
-    
-    def normalize_errors(errors, target_scale=100):
-        mean_error = np.mean(errors)
-        scale_factor = target_scale / mean_error if mean_error else 1
-        normalized_errors = errors * scale_factor
-        return normalized_errors #outputs a normalised error array
-    
+    # Combine errors
+    errors = np.concatenate([reprojection_error, photometric_error, np.array([total_penalty])])
 
-    normalize_errors=normalize_errors(errors, target_scale=100)
-    # print(" The photometric error : ", np.mean(photometric_error)) 
-    # print("Reprojection error: ", np.mean(reprojection_error))
-    return normalize_errors #outputs the mean error of the normalised error array
+    return errors
 
 def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field):
     # result = least_squares(objective_function, 
@@ -133,8 +125,8 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
                        initial_params,
                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
                        method='trf',  # Trust Region Reflective algorithm supports bounds
-                       bounds=([-np.inf]*9 + [-10, -10, -10] + [0, 0],  # Lower bounds
-                               [np.inf]*9 + [10, 10, 10] + [np.inf, np.inf]),  # Upper bounds
+                      bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0, 0],  # Lower bounds for def params, rot and translation no bounds
+                               [np.inf]*9 + [np.inf, np.inf, np.inf] + [10, 10]),  # Upper bounds for def params, rot and translation no bounds
                        max_nfev=1000, 
                        gtol=1e-8)
     return result.x
@@ -153,7 +145,7 @@ def detect_feature_points(image):
 def main():
     frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S1'
     start_time=time.time()
-    #cframes_directory = '/Users/ekole/Dev/gut_slam/gut_images'
+    #frames_directory = '/Users/ekole/Dev/gut_slam/gut_images'
     frames = load_frames_from_directory(frames_directory)
     total_optim_time = 0
     yaw=np.radians(0)
@@ -210,8 +202,8 @@ def main():
         gamma = 2.2
 
         if frame_idx == 0:
-            initial_deformation_strength = 0.1
-            initial_deformation_frequency = 1
+            initial_deformation_strength = 0
+            initial_deformation_frequency = 0
         else:
             initial_deformation_strength = optimized_deformation_strength
             initial_deformation_frequency = optimized_deformation_frequency

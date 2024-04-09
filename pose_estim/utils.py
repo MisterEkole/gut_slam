@@ -403,4 +403,81 @@ def euler_to_rot_mat(yaw, pitch, roll):
    
     rot_mat = Rz_yaw @ Ry_pitch @ Rx_roll #xyz order
     return rot_mat
+##=============================================================================
+##=============================================================================
+## Objective Func--1 for bundle adjustment
+##=============================================================================
+##=============================================================================
+
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field):
+    if not isinstance(points_2d_observed, np.ndarray):
+        points_2d_observed = np.array(points_2d_observed)
+
+    rotation_matrix = params[:9].reshape(3, 3)
+    translation_vector = params[9:12]
+    deformation_strength = params[12]
+    deformation_frequency = params[13]
+    
+    # Update deformation parameters
+    warp_field.apply_deformation_axis(strength=deformation_strength, frequency=deformation_frequency)
+    points_3d_deformed = warp_field.extract_pts()
+
+    projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
+    projected_2d_pts = projector.project_points(points_3d_deformed)
+    #print("Before error line:", type(points_2d_observed), points_2d_observed.shape)
+
+    #Resize projected_2d_pts to match points_2d_observed
+    if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
+        projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
+    elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
+        points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
+    
+    points_2d_observed=points_2d_observed.reshape(-1, 2)
+    
+        
+    reprojection_error = (np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1))
+    lamda_reg = 1.0
+    
+    photometric_error = []
+    for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
+        x, y, z = pt3d
+        L = calib_p_model(x, y, z, k, g_t, gamma)
+        if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:  #check if pts2d is within boundary of image, then proceed to compute pixel intensity
+            pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
+            C = cost_func(pixel_intensity, L)
+        else:
+            C = 0 
+      
+        
+        photometric_error.append(C)
+    grad=np.mean(np.ones((projected_2d_pts.shape[0],)))
+    reg=reg_func(grad)
+    photometric_error = np.array(photometric_error+lamda_reg*reg)
+
+
+    ''' adding rotation matrix constraints'''
+    #Orthogonality constraint
+    ortho_pen_scale=10
+    ortho_penalty = ortho_pen_scale * np.linalg.norm(np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3))
+    ortho_penalty*=ortho_pen_scale
+
+    #derterminant constraint
+    det_pen_scale=10
+    det_penalty = det_pen_scale * ((np.linalg.det(rotation_matrix) - 1)**2)
+    det_penalty*=det_pen_scale
+
+    errors = np.concatenate([reprojection_error, photometric_error.flatten()])
+    errors=np.append(errors, [ortho_penalty, det_penalty])
+    
+    def normalize_errors(errors, target_scale=100):
+        mean_error = np.mean(errors)
+        scale_factor = target_scale / mean_error if mean_error else 1
+        normalized_errors = errors * scale_factor
+        return normalized_errors #outputs a normalised error array
+    
+
+    #normalize_errors=normalize_errors(errors, target_scale=100)
+    #print(" The photometric error : ", np.mean(photometric_error)) 
+    #print("Reprojection error: ", np.mean(reprojection_error))
+    return errors #outputs the mean error of the normalised error array
 
