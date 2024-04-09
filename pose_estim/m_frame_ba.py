@@ -265,7 +265,7 @@ def main():
         optimized_deformation_frequency = optimized_params[13]
 
         log_optim_params(optimized_params, frame_idx)
-        #print("Optimizing Frame: ", frame_idx)
+        print("Optimizing Frame: ", frame_idx)
 
         # plt.imshow(image)
         # plt.xlim(0, image.shape[1])
