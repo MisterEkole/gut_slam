@@ -33,7 +33,6 @@ def load_frames_from_video(video_path):
 # Function to load frames from a directory of images
 def load_frames_from_directory(directory_path):
     frames = []
-    # List of image file extensions that are commonly used
     valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
     # Filter files in the directory to include only those with the above extensions
     image_files = sorted([f for f in os.listdir(directory_path) if f.lower().endswith(valid_extensions) and os.path.isfile(os.path.join(directory_path, f))])
@@ -137,11 +136,14 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
     result = least_squares(objective_function, 
                        initial_params,
                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-                       method='trf',  # Trust Region Reflective algorithm supports bounds
+                       method='trf',  # Trust Region Reflective algorithm s
                        bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0.1, 0.5],  # Lower bounds for def params, rot and translation no bounds
                                [np.inf]*9 + [np.inf, np.inf, np.inf] + [10, 10]),  # Upper bounds for def params, rot and translation no bounds
-                       max_nfev=1000, 
-                       gtol=1e-6)
+                       max_nfev=500, 
+                       gtol=1e-6,
+                       tr_solver='lsmr'
+                       #verbose=2
+                       )
     
     log_errors(optimization_errors, frame_idx)
 
@@ -203,15 +205,12 @@ def main():
         resolution = 100
 
         points_2d_observed=detect_feature_points(image)
-      
-
-        
-
         # Initialize or update warp field for each frame
         warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
         cylinder_points = warp_field.extract_pts()
+        
         if frame_idx == 0:
-            warp_field.apply_deformation_axis(strength=5, frequency=10)
+            warp_field.apply_deformation_axis(strength=0.1, frequency=0.5)
         else:
             # Adjust strength and frequency based on optimized parameters from the previous frame
             warp_field.apply_deformation_axis(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
@@ -266,6 +265,7 @@ def main():
         optimized_deformation_frequency = optimized_params[13]
 
         log_optim_params(optimized_params, frame_idx)
+        #print("Optimizing Frame: ", frame_idx)
 
         # plt.imshow(image)
         # plt.xlim(0, image.shape[1])
