@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 def main():
     image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
     image = cv2.imread(image_path)
-    
+    yaw=np.radians(0)
+    pitch=np.radians(0)
+    roll=np.radians(0)
     if image is None:
         print("Error: Image not found.")
         return
@@ -30,9 +32,11 @@ def main():
     #                          [0, 552.0, image_width/2],
     #                          [0, 0, 1]])
 
-    rot_mat = np.array([[1, 0, 0],   
-                            [0, 1, 0],
-                            [0, 0, 1]])
+    # rot_mat = np.array([[1, 0, 0],   
+    #                         [0, 1, 0],
+    #                         [0, 0, 1]])
+
+    rot_mat=euler_to_rot_mat(yaw,pitch,roll)
 
     trans_mat = np.array([0, 0, 0]) 
 
@@ -98,10 +102,10 @@ def main():
 
     #plot 3D cylinder
 
-    # plotter = pv.Plotter()
-    # plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
-    # plotter.add_title("Deformable Cylinder Visualization")
-    # plotter.show()
+    plotter = pv.Plotter()
+    plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
+    plotter.add_title("Deformable Cylinder Visualization")
+    plotter.show()
 
     #display_point_cloud(cylinder_points)
 
