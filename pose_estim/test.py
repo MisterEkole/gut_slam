@@ -32,9 +32,9 @@ def rotation_matrix_determinant_check(rotation_matrix):
 #                         [2.67578883  ,1.4228946  , 0.91158914],
 #                         [1.2113317 , -0.44226942  ,8.65885199]])
 
-rot_mat=np.array(  [[ 0.78612426 ,-0.26814632 ,-1.11995492],
- [ 0.74961969 , 0.6826937 ,  0.35775796],
- [ 0.65911221 ,-0.46294783 , 0.42110323]])
+rot_mat=np.array(  [[ 2479.17783612, -2159.27796918 , 2514.37599681],
+ [ 1495.09663943 ,-2333.08040495 , 1165.99760515],
+ [  738.32521676  , -32.14561929 , 2907.38941994]])
 
 determinant, is_zero = rotation_matrix_determinant_check(rot_mat)
 norm_of_result = rotation_matrix_check(rot_mat)

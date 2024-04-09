@@ -59,6 +59,8 @@ def rotation_matrix_to_vector(rotation_matrix):
     rotation_vector, _ = cv2.Rodrigues(rotation_matrix)
     return rotation_vector
 
+
+optimization_errors=[]
 def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field):
     if not isinstance(points_2d_observed, np.ndarray):
         points_2d_observed = np.array(points_2d_observed)
@@ -112,11 +114,22 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     total_penalty /= (total_penalty + 1e-8)
 
     # Combine errors
+
+    global optimization_errors
+    optimization_errors.append(
+        {
+            'reprojection_error': np.mean(reprojection_error),
+            'photometric_error': np.mean(photometric_error),
+        }
+    )
     errors = np.concatenate([reprojection_error, photometric_error, np.array([total_penalty])])
+  
 
     return errors
 
-def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field):
+def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
+    global optimization_errors
+    optimization_errors=[]
     # result = least_squares(objective_function, 
     #                        initial_params,
     #                      args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
@@ -125,14 +138,29 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
                        initial_params,
                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
                        method='trf',  # Trust Region Reflective algorithm supports bounds
-                      bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0, 0],  # Lower bounds for def params, rot and translation no bounds
+                       bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0.1, 0.5],  # Lower bounds for def params, rot and translation no bounds
                                [np.inf]*9 + [np.inf, np.inf, np.inf] + [10, 10]),  # Upper bounds for def params, rot and translation no bounds
                        max_nfev=1000, 
-                       gtol=1e-8)
+                       gtol=1e-6)
+    
+    log_errors(optimization_errors, frame_idx)
+
     return result.x
 
 
-def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, warp_field):
+def log_errors(errors, frame_idx):
+   
+    with open('./optimization_errors_all_frames.txt', 'a') as f:
+        f.write(f"Frame {frame_idx}\n")  # Indicate the start of a new frame
+        for idx, error in enumerate(errors):
+            f.write(f"Iteration {idx + 1}: Reprojection Error: {error['reprojection_error']:.4f}, Photometric Error: {error['photometric_error']:.4f}\n")
+        mean_reprojection_error = np.mean([error['reprojection_error'] for error in errors])
+        mean_photometric_error = np.mean([error['photometric_error'] for error in errors])
+        f.write(f"Mean Reprojection Error: {mean_reprojection_error:.4f}\n")
+        f.write(f"Mean Photometric Error: {mean_photometric_error:.4f}\n\n")  
+
+     
+def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, warp_field, frame_idx):
     points_2d_observed = Project3D_2D_cam(intrinsic_matrix, initial_params[:9].reshape(3, 3), initial_params[9:12]).project_points(points_3d)
     optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field)
     return optimized_params
@@ -142,15 +170,27 @@ def detect_feature_points(image):
     kp=cv2.KeyPoint_convert(kp)
     return kp
 
+def log_optim_params(optimized_params, frame_idx):
+    with open('./optimized_params_all_frames.txt', 'a') as f:
+        f.write(f"Frame {frame_idx}\n")
+        f.write("Optimized Parameters:\n")
+        f.write("Rotation Matrix: \n")
+        f.write(str(optimized_params[:9].reshape(3, 3)) + "\n")
+        f.write("Translation Vector: \n")
+        f.write(str(optimized_params[9:12]) + "\n")
+        f.write("Deformation Strength: ")
+        f.write(str(optimized_params[12]) + "\n")
+        f.write("Deformation Frequency: ")
+        f.write(str(optimized_params[13]) + "\n\n")
+
 def main():
     frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S1'
+    print("Optimization started...")
     start_time=time.time()
     #frames_directory = '/Users/ekole/Dev/gut_slam/gut_images'
     frames = load_frames_from_directory(frames_directory)
     total_optim_time = 0
-    yaw=np.radians(0)
-    pitch=np.radians(0)
-    roll=np.radians(0)
+   
     
     # Assuming the first frame's parameters are applicable as the starting point for the next frames
     for frame_idx, image in enumerate(frames):
@@ -177,15 +217,24 @@ def main():
             warp_field.apply_deformation_axis(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
 
         if frame_idx == 0:
-        
-           
-           
-            # rot_mat = np.array([[0.5, 0.8, 3.5],   
-            #                  [2, 1, 2],
-            #                 [1.5, 0, 10]]) #vp
-            
-            rot_mat=euler_to_rot_mat(yaw,pitch,roll)
-      
+            z_vector = np.array([0, 0, 10]) #vp
+            z_unit_vector = z_vector / np.linalg.norm(z_vector)
+
+            # Define X vector of the camera
+            x_camera_vector = np.array([1, 0, 0])
+
+            # Calculate Y vector
+            y_vector = np.cross(z_unit_vector, x_camera_vector)
+
+            # Recalculate X vector based on new Y
+            x_vector = np.cross(z_unit_vector, y_vector)
+
+            # Normalize X and Y vectors to ensure they are unit vectors
+            x_vector /= np.linalg.norm(x_vector)
+            y_vector /= np.linalg.norm(y_vector)
+
+            # Construct rotation matrix
+            rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
             trans_mat=np.array([0, 0, 10])
         else:
             # Use the optimized parameters from the previous frame for initialization
@@ -193,24 +242,20 @@ def main():
             trans_mat = optimized_params[9:12]
 
         intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat)
-        
-        
-        #points_2d_observed = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector).project_points(cylinder_points)
-
         k = 2.5
         g_t = 2.0
         gamma = 2.2
 
         if frame_idx == 0:
-            initial_deformation_strength = 0
-            initial_deformation_frequency = 0
+            initial_deformation_strength = 0.1
+            initial_deformation_frequency = 0.5
         else:
             initial_deformation_strength = optimized_deformation_strength
             initial_deformation_frequency = optimized_deformation_frequency
 
         initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), initial_deformation_strength, initial_deformation_frequency])
         optim_start_time = time.time()
-        optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field)
+        optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx)
 
         optim_end_time = time.time()
 
@@ -220,6 +265,8 @@ def main():
         optimized_deformation_strength = optimized_params[12]
         optimized_deformation_frequency = optimized_params[13]
 
+        log_optim_params(optimized_params, frame_idx)
+
         # plt.imshow(image)
         # plt.xlim(0, image.shape[1])
         # plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
@@ -228,14 +275,14 @@ def main():
         # plt.show()
 
         # Optional: Visualize  the optimized results for each frame
-        print(f"Optimization time for frame {frame_idx}: {optim_time:.2f} seconds")
+        # print(f"Optimization time for frame {frame_idx}: {optim_time:.2f} seconds")
 
-        print(f"Frame {frame_idx}: Optimized Parameters:")
-        print("Rotation Matrix: \n",optimized_params[:9].reshape(3, 3))
-        #print("Optimized Rotation Vector: \n", rotation_matrix_to_vector(optimized_params[:9].reshape(3, 3)))
-        print("Optimized Translation Vector: \n", optimized_params[9:12])
-        print("Optimized Deformation Strength: ", optimized_deformation_strength)
-        print("Optimized Deformation Frequency: ", optimized_deformation_frequency)
+        # print(f"Frame {frame_idx}: Optimized Parameters:")
+        # print("Rotation Matrix: \n",optimized_params[:9].reshape(3, 3))
+        # #print("Optimized Rotation Vector: \n", rotation_matrix_to_vector(optimized_params[:9].reshape(3, 3)))
+        # print("Optimized Translation Vector: \n", optimized_params[9:12])
+        # print("Optimized Deformation Strength: ", optimized_deformation_strength)
+        # print("Optimized Deformation Frequency: ", optimized_deformation_frequency)
     end_time=time.time()
     total_time=end_time-start_time
     print(f"Total execution time: {total_time:.2f} seconds")
