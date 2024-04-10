@@ -54,8 +54,9 @@ def main():
 
     # Apply deformation to the cylinder (optional)
     #warp_field.apply_shrinking(start_radius=None, end_radius=None)
-    #warp_field.apply_deformation(strength=0.1,frequency=1)
-    warp_field.apply_deformation_axis(strength=5,frequency=10)
+    #warp_field.apply_deformation(strength=0,frequency=0)
+    warp_field.b_spline_deformation(strength=100,frequency=10)
+    #warp_field.apply_deformation_axis(strength=5,frequency=10)
     
 
     # Extract points from the cylinder
@@ -65,7 +66,7 @@ def main():
     projected_pts=projector.project_points(points_3d=cylinder_points)
 
     #print(projected_pts)
-    print(warp_field.cylinder.points)
+    #print(warp_field.cylinder.points)
     k=2.5
     g_t=2.0
     gamma=2.2

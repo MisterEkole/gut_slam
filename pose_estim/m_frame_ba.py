@@ -23,10 +23,10 @@ def load_frames_from_video(video_path):
     while True:
         ret, frame = cap.read()
         if not ret:
-            break  # Break the loop when there are no frames left to read
+            break  
         frames.append(frame)
 
-    cap.release()  # Release the video capture object
+    cap.release()  
     return frames
 
 
@@ -34,7 +34,6 @@ def load_frames_from_video(video_path):
 def load_frames_from_directory(directory_path):
     frames = []
     valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
-    # Filter files in the directory to include only those with the above extensions
     image_files = sorted([f for f in os.listdir(directory_path) if f.lower().endswith(valid_extensions) and os.path.isfile(os.path.join(directory_path, f))])
 
     for image_file in image_files:
@@ -70,7 +69,8 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     deformation_frequency = params[13]
     
     # Update deformation parameters
-    warp_field.apply_deformation_axis(strength=deformation_strength, frequency=deformation_frequency)
+    #warp_field.apply_deformation_axis(strength=deformation_strength, frequency=deformation_frequency)
+    warp_field.b_spline_deformation(strength=deformation_strength, frequency=deformation_frequency)
     points_3d_deformed = warp_field.extract_pts()
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
@@ -137,9 +137,9 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
                        initial_params,
                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
                        method='trf',  # Trust Region Reflective algorithm s
-                       bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0.1, 0.5],  # Lower bounds for def params, rot and translation no bounds
-                               [np.inf]*9 + [np.inf, np.inf, np.inf] + [10, 10]),  # Upper bounds for def params, rot and translation no bounds
-                       max_nfev=500, 
+                       bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [10, 10],  # Lower bounds for def params, rot and translation no bounds
+                               [np.inf]*9 + [np.inf, np.inf, np.inf] + [250, 100]),  # Upper bounds for def params, rot and translation no bounds
+                       max_nfev=1000, 
                        gtol=1e-6,
                        tr_solver='lsmr'
                        #verbose=2
@@ -210,10 +210,12 @@ def main():
         cylinder_points = warp_field.extract_pts()
         
         if frame_idx == 0:
-            warp_field.apply_deformation_axis(strength=0.1, frequency=0.5)
+            #warp_field.apply_deformation_axis(strength=0.1, frequency=0.5)
+            warp_field.b_spline_deformation(strength=10, frequency=10)
         else:
             # Adjust strength and frequency based on optimized parameters from the previous frame
-            warp_field.apply_deformation_axis(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
+            #warp_field.apply_deformation_axis(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
+            warp_field.b_spline_deformation(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
 
         if frame_idx == 0:
             z_vector = np.array([0, 0, 10]) #vp
@@ -246,8 +248,8 @@ def main():
         gamma = 2.2
 
         if frame_idx == 0:
-            initial_deformation_strength = 0.1
-            initial_deformation_frequency = 0.5
+            initial_deformation_strength = 10
+            initial_deformation_frequency = 10
         else:
             initial_deformation_strength = optimized_deformation_strength
             initial_deformation_frequency = optimized_deformation_frequency
