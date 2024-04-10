@@ -7,6 +7,7 @@ import numpy as np
 import open3d as o3d
 import pyvista as pv
 from scipy.optimize import least_squares
+from scipy.interpolate import make_interp_spline, BSpline
 
 class WarpField:
     """
@@ -42,7 +43,7 @@ class WarpField:
         points[:,2]+=strength*np.sin(frequency*points[:,2])
         self.cylinder.points = points
     
-    @staticmethod
+    #@staticmethod
     def apply_deformation(self, strength=0.1, frequency=1):
         # Get the points of the cylinder mesh
         points = self.cylinder.points
@@ -129,6 +130,43 @@ class WarpField:
 
         
         self.cylinder.points = densified_points[:target_count]
+    def b_spline_deformation(self, strength=0.5, frequency=0.1):
+        """
+        Apply B-Spline deformation to cylinder mesh to mimic complex deformations in the human gut.
+
+        Parameters:
+        - strength: Magnitude of the deformation.
+        - frequency: Influences the degree of spread of control points, affecting curvature."""
+
+        num_control_points=frequency*2+1
+        heights=np.linspace(0, self.height, int(num_control_points))
+        angles=np.linspace(0, 2*np.pi, int(num_control_points), endpoint=False)
+
+        #control point swirl around cylinder axis
+
+        control_points_x=self.center[0]+np.cos(angles)*strength+self.radius
+        control_points_y=self.center[1]+np.sin(angles)*strength+self.radius
+        control_points_z=self.center[2]+heights
+
+
+        #interpolating b-spline through control points
+        spline_x=make_interp_spline(control_points_z, control_points_x)
+        spline_y=make_interp_spline(control_points_z, control_points_y)
+
+        points=self.cylinder.points
+
+        for i, point in enumerate(points):
+            new_x=spline_x(point[2])
+            new_y=spline_y(point[2])
+
+            #apply deformation based on cylinder axis to simulate "bulging" effect
+
+            dist_from_axis=np.sqrt((point[0]-self.center[0])**2+(point[1]-self.center[1])**2)
+            deformation_scale=strength*dist_from_axis/self.radius
+
+            points[i][0]=(new_x-point[0])+deformation_scale
+            points[i][1]=(new_y-point[1])+deformation_scale
+        self.cylinder.points=points
     
     
 class Points_Processor:
