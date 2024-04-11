@@ -5,7 +5,8 @@ from utils import *
 import matplotlib.pyplot as plt
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
+    #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
     image = cv2.imread(image_path)
     yaw=np.radians(0)
     pitch=np.radians(0)
@@ -55,7 +56,7 @@ def main():
     # Apply deformation to the cylinder (optional)
     #warp_field.apply_shrinking(start_radius=None, end_radius=None)
     #warp_field.apply_deformation(strength=0,frequency=0)
-    warp_field.b_spline_deformation(strength=100,frequency=10)
+    warp_field.b_spline_deformation(strength=150,frequency=10)
     #warp_field.apply_deformation_axis(strength=5,frequency=10)
     
 
@@ -109,6 +110,9 @@ def main():
     plotter.show()
 
     #display_point_cloud(cylinder_points)
+    #visualize_point_cloud(cylinder_points)
+    #point_cloud_to_mesh(cylinder_points)
+    visualize_mesh_from_points(cylinder_points)
 
 
   

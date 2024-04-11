@@ -150,8 +150,8 @@ class WarpField:
 
 
         #interpolating b-spline through control points
-        spline_x=make_interp_spline(control_points_z, control_points_x)
-        spline_y=make_interp_spline(control_points_z, control_points_y)
+        spline_x=make_interp_spline(control_points_z, control_points_x, bc_type='clamped')
+        spline_y=make_interp_spline(control_points_z, control_points_y, bc_type='clamped')
 
         points=self.cylinder.points
 
@@ -367,7 +367,7 @@ class Project3D_2D_cam:
 
 # =============================================================================
 # =============================================================================
-# Utils functions for Photometric model
+# Utils  for Photometric model
 # =============================================================================
 # =============================================================================
 
@@ -519,3 +519,73 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     #print("Reprojection error: ", np.mean(reprojection_error))
     return errors #outputs the mean error of the normalised error array
 
+
+##=============================================================================
+##=============================================================================
+## Visualization Utils 
+##=============================================================================
+##=============================================================================
+
+def visualize_point_cloud(points):
+    """
+    Visualizes a point cloud using Open3D.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    """
+    # Convert the NumPy array of points into an Open3D PointCloud object
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    
+    # Optionally, estimate normals to improve the visualization. This can be useful
+    # for visualizing the point cloud with lighting effects.
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=30))
+    
+    # Visualize the point cloud
+    o3d.visualization.draw_geometries([pcd], window_name="Point Cloud Visualization", point_show_normal=True)
+
+
+def point_cloud_to_mesh(points):
+    """
+    Reconstructs a mesh from a point cloud and visualizes it using Open3D.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    """
+    # Create a point cloud object from the points
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    
+    # Estimate normals if they are not already present
+    if not pcd.has_normals():
+        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=30))
+    
+    # Use the Ball Pivoting algorithm (BPA) to reconstruct the mesh
+    radii = [10, 100, 100, 100]  # Set radii for ball pivoting, adjust based on your point cloud density
+    bpa_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+                   pcd,
+                   o3d.utility.DoubleVector(radii))
+    
+    # Optionally, simplify the mesh
+    dec_mesh = bpa_mesh.simplify_quadric_decimation(target_number_of_triangles=1000)
+    
+    # Visualize the mesh
+    o3d.visualization.draw_geometries([dec_mesh], window_name="Mesh Visualization")
+
+
+def visualize_mesh_from_points(points):
+    """
+    Creates and visualizes a mesh from a given set of points using PyVista.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    """
+    # Create a PyVista point cloud object
+    cloud = pv.PolyData(points)
+    mesh = cloud.delaunay_2d()
+    
+    # Visualize the mesh
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, color='blue', show_edges=True)
+    #plotter.add_points(points, color='red')  # Optionally add the original points on top
+    plotter.show()

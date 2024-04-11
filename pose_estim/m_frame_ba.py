@@ -6,7 +6,7 @@ Date: 04-04-2024
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
-from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, cost_func, get_pixel_intensity, reg_func, euler_to_rot_mat
+from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, cost_func, get_pixel_intensity, reg_func, visualize_point_cloud
 import matplotlib.pyplot as plt
 import os
 import time
@@ -69,18 +69,21 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     deformation_frequency = params[13]
     
     # Update deformation parameters
-    #warp_field.apply_deformation_axis(strength=deformation_strength, frequency=deformation_frequency)
     warp_field.b_spline_deformation(strength=deformation_strength, frequency=deformation_frequency)
     points_3d_deformed = warp_field.extract_pts()
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     projected_2d_pts = projector.project_points(points_3d_deformed)
+    # print("Projected 2D points shape: ", projected_2d_pts.shape)
+    # print("Observed 2D points shape: ", points_2d_observed.shape)
 
     # Resize projected_2d_pts to match points_2d_observed
     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
+    
+    
     
     points_2d_observed = points_2d_observed.reshape(-1, 2)
     
@@ -126,6 +129,9 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
     return errors
 
+
+
+
 def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
     global optimization_errors
     optimization_errors=[]
@@ -137,8 +143,8 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
                        initial_params,
                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
                        method='trf',  # Trust Region Reflective algorithm s
-                       bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [10, 10],  # Lower bounds for def params, rot and translation no bounds
-                               [np.inf]*9 + [np.inf, np.inf, np.inf] + [250, 100]),  # Upper bounds for def params, rot and translation no bounds
+                       bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [-np.inf, -np.inf],  # Lower bounds for def params, rot and translation no bounds
+                               [np.inf]*9 + [np.inf, np.inf, np.inf] + [np.inf, np.inf]),  # Upper bounds for def params, rot and translation no bounds
                        max_nfev=1000, 
                        gtol=1e-6,
                        tr_solver='lsmr'
@@ -210,11 +216,10 @@ def main():
         cylinder_points = warp_field.extract_pts()
         
         if frame_idx == 0:
-            #warp_field.apply_deformation_axis(strength=0.1, frequency=0.5)
+           
             warp_field.b_spline_deformation(strength=10, frequency=10)
         else:
             # Adjust strength and frequency based on optimized parameters from the previous frame
-            #warp_field.apply_deformation_axis(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
             warp_field.b_spline_deformation(strength=optimized_deformation_strength, frequency=optimized_deformation_frequency)
 
         if frame_idx == 0:
@@ -248,8 +253,8 @@ def main():
         gamma = 2.2
 
         if frame_idx == 0:
-            initial_deformation_strength = 10
-            initial_deformation_frequency = 10
+            initial_deformation_strength = 1
+            initial_deformation_frequency = 1
         else:
             initial_deformation_strength = optimized_deformation_strength
             initial_deformation_frequency = optimized_deformation_frequency
@@ -288,6 +293,7 @@ def main():
     end_time=time.time()
     total_time=end_time-start_time
     print(f"Total execution time: {total_time:.2f} seconds")
+    #visualize_point_cloud(cylinder_points)
 
 if __name__ == "__main__":
     main()
