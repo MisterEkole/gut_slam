@@ -130,7 +130,7 @@ class WarpField:
 
         
         self.cylinder.points = densified_points[:target_count]
-    def b_spline_deformation(self, strength=0.5, frequency=0.1):
+    def b_spline_deformation(self, strength=None, frequency=None):
         """
         Apply B-Spline deformation to cylinder mesh to mimic complex deformations in the human gut.
 
