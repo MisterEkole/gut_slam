@@ -64,75 +64,7 @@ def rotation_matrix_to_vector(rotation_matrix):
 
 
 optimization_errors=[]
-# def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field):
-#     if not isinstance(points_2d_observed, np.ndarray):
-#         points_2d_observed = np.array(points_2d_observed)
 
-#     rotation_matrix = params[:9].reshape(3, 3)
-#     translation_vector = params[9:12]
-#     deformation_strength = params[12]
-#     deformation_frequency = params[13]
-    
-#     # Update deformation parameters
-#     warp_field.b_spline_deformation(strength=deformation_strength, frequency=deformation_frequency)
-#     points_3d_deformed = warp_field.extract_pts()
-
-#     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-#     projected_2d_pts = projector.project_points(points_3d_deformed)
-#     # print("Projected 2D points shape: ", projected_2d_pts.shape)
-#     # print("Observed 2D points shape: ", points_2d_observed.shape)
-
-#     # Resize projected_2d_pts to match points_2d_observed
-#     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
-#         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
-#     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
-#         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
-    
-    
-    
-#     points_2d_observed = points_2d_observed.reshape(-1, 2)
-    
-#     # Compute reprojection error
-#     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
-    
-#     # Compute photometric error
-#     photometric_error = []
-#     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
-#         x, y, z = pt3d
-#         L = calib_p_model(x, y, z, k, g_t, gamma)
-#         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:  # Check if pt2d is within image boundary
-#             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
-#             C = cost_func(pixel_intensity, L)
-#         else:
-#             C = 0
-#         photometric_error.append(float(C))
-#     photometric_error = np.array(photometric_error, dtype=float)
-
-#     # Normalize each error type to the same scale
-#     reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
-#     photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
-
-#     # Compute rotation matrix constraints (penalties)
-#     ortho_penalty = 100 * np.linalg.norm(np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3))
-#     det_penalty = 100 * (abs(np.linalg.det(rotation_matrix) - 1))**2
-
-#     # Normalize penalties
-#     total_penalty = ortho_penalty + det_penalty
-#     total_penalty /= (total_penalty + 1e-8)
-
-#     # Combine errors
-
-#     global optimization_errors
-#     optimization_errors.append(
-#         {
-#             'reprojection_error': np.mean(reprojection_error),
-#             'photometric_error': np.mean(photometric_error),
-#         }
-#     )
-#     errors = np.concatenate([reprojection_error, photometric_error, np.array([total_penalty])])
-  
-
-#     return errors
 
 
 def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det):
@@ -197,28 +129,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
 
 
-# def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
-#     global optimization_errors
-#     optimization_errors=[]
-#     # result = least_squares(objective_function, 
-#     #                        initial_params,
-#     #                      args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-#     #                      method='lm', max_nfev=2000, gtol=1e-6)
-#     result = least_squares(objective_function, 
-#                        initial_params,
-#                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-#                        method='trf',  # Trust Region Reflective algorithm s
-#                        bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0, 0],  # Lower bounds for def params, rot and translation no bounds
-#                                [np.inf]*9 + [np.inf, np.inf, np.inf] + [np.inf, np.inf]),  # Upper bounds for def params, rot and translation no bounds
-#                        #max_nfev=5000, 
-#                        gtol=1e-8,
-#                        tr_solver='lsmr'
-#                        #verbose=2
-#                        )
-    
-#     log_errors(optimization_errors, frame_idx)
 
-#     return result.x
 def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
     global optimization_errors
     optimization_errors = []

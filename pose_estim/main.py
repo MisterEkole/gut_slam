@@ -4,6 +4,37 @@ import pyvista as pv
 from utils import *
 import matplotlib.pyplot as plt
 
+def initialize_control_points(radius, height, M, N):
+    """
+    Initialize a grid of control points on the surface of a cylinder.
+    
+    Parameters:
+    - radius: The radius of the cylinder.
+    - height: The height of the cylinder.
+    - M: Number of vertical control points (height divisions).
+    - N: Number of circumferential control points (angular divisions).
+    
+    Returns:
+    - control_points: A numpy array of shape (M, N, 3).
+    """
+    # Define the heights and angles
+    heights = np.linspace(0, height, M)
+    angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
+
+    # Create meshgrid for heights and angles
+    heights_grid, angles_grid = np.meshgrid(heights, angles, indexing='ij')
+
+    # Calculate x, y, z positions
+    x_positions = radius * np.cos(angles_grid)
+    y_positions = radius * np.sin(angles_grid)
+    z_positions = heights_grid
+
+    # Stack the positions into a 3D array
+    control_points = np.stack((x_positions, y_positions, z_positions), axis=-1)
+
+    return control_points
+
+
 def main():
     #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
     image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
@@ -48,6 +79,7 @@ def main():
     image_height, image_width, rot_mat, trans_mat)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
+    
 
 
     # camera_matrix = Project3D_2D.get_camera_parameters(image_height, image_width)
@@ -56,7 +88,10 @@ def main():
     # Apply deformation to the cylinder (optional)
     #warp_field.apply_shrinking(start_radius=None, end_radius=None)
     #warp_field.apply_deformation(strength=0,frequency=0)
-    warp_field.b_spline_deformation(strength=150,frequency=10)
+    #warp_field.b_spline_deformation(strength=0.07525205880031738,frequency=-5.903224673103456e-06)
+    control_points=initialize_control_points(radius=900, height=100, M=500, N=1000)
+    #control_points=np.random.rand(50,50,3)
+    warp_field.b_spline_mesh_deformation(control_points=control_points, strength=10)
     #warp_field.apply_deformation_axis(strength=5,frequency=10)
     
 
@@ -91,11 +126,11 @@ def main():
 
   
 
-    plt.imshow(image)
-    plt.xlim(0, image.shape[1])
-    plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
-    plt.scatter(projected_pts[:, 0], projected_pts[:, 1], color='red', s=10)  # Increased size for visibility
-    plt.show()
+    # plt.imshow(image)
+    # plt.xlim(0, image.shape[1])
+    # plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
+    # plt.scatter(projected_pts[:, 0], projected_pts[:, 1], color='red', s=10)  # Increased size for visibility
+    # plt.show()
 
 
     # plt.imshow(image)
@@ -104,15 +139,16 @@ def main():
 
     #plot 3D cylinder
 
-    plotter = pv.Plotter()
-    plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
-    plotter.add_title("Deformable Cylinder Visualization")
-    plotter.show()
+    # plotter = pv.Plotter()
+    # plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
+    # plotter.add_title("Deformable Cylinder Visualization")
+    # plotter.show()
 
     #display_point_cloud(cylinder_points)
     #visualize_point_cloud(cylinder_points)
     #point_cloud_to_mesh(cylinder_points)
     visualize_mesh_from_points(cylinder_points)
+    #visualize_point_cloud(cylinder_points)
 
 
   
