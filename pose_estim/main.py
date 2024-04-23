@@ -3,6 +3,7 @@ import numpy as np
 import pyvista as pv
 from utils import *
 import matplotlib.pyplot as plt
+from PIL import Image
 
 def initialize_control_points(radius, height, M, N):
     """
@@ -34,10 +35,47 @@ def initialize_control_points(radius, height, M, N):
 
     return control_points
 
+def initial_control_points(all_points, vp, height, width):
+    M, N = height, width
+    heights = np.linspace(0, 1, M)  # Assuming normalized heights for simplicity
+    control_points = np.zeros((M, N, 3))  # Initialize control points array
+
+    # Compute angles and control points
+    for i, point in enumerate(all_points):
+        p_minus_vp = point - vp
+        theta = np.arctan2(p_minus_vp[1], p_minus_vp[0])
+        h = np.linalg.norm(p_minus_vp)**2  # Squared norm as the 'height' metric
+        m_index = int(h * (M - 1))  # Map height to the closest index
+        n_index = int(((theta + np.pi) / (2 * np.pi)) * (N - 1))  # Map angle to index
+
+        # Assuming control points need to be set or adjusted here:
+        control_points[m_index, n_index, :] = point  # Place or modify the point at this control point location
+
+    return control_points
+
+def extract_points_from_image(image_path):
+    # Load image
+    img = Image.open(image_path).convert('L')  # Convert to grayscale
+    data = np.array(img)
+
+    # Extract points where brightness is above a threshold
+    threshold = 128  
+    points = np.column_stack(np.where(data > threshold))
+
+    # Normalize points based on image dimensions
+    height, width = data.shape
+    points = points / np.array([height, width])
+
+    # Append dummy z-coordinate if needed for compatibility
+    points = np.hstack([points, np.zeros((points.shape[0], 1))])
+
+    return points
+
+
 
 def main():
     #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     image = cv2.imread(image_path)
     yaw=np.radians(0)
     pitch=np.radians(0)
@@ -57,7 +95,28 @@ def main():
     center = image_center
     resolution = 100
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
-   
+
+    a_values = np.zeros((image_height, image_width, 3)) 
+    b_values = np.zeros((image_height, image_width))  
+    
+
+    
+    for row in range(image_height):
+        for col in range(image_width):
+            pixel = image[row, col]
+            p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
+            a_values[row, col] = p_minus_vp
+            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
+
+           
+    
+    a_values=np.array(a_values)
+    a_values=np.max(a_values/(np.linalg.norm(np.mean(a_values,axis=1))))
+    b_values=np.array(b_values)
+    b_values=np.max(b_values/(np.linalg.norm(b_values)))
+
+    print(a_values)
+    print(b_values)
 
 
     # intrinsic_matrix = np.array([[735.37, 0, image_height/2],
@@ -80,45 +139,38 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-
-
-    # camera_matrix = Project3D_2D.get_camera_parameters(image_height, image_width)
-    # projector = Project3D_2D(camera_matrix)
-
     # Apply deformation to the cylinder (optional)
-    #warp_field.apply_shrinking(start_radius=None, end_radius=None)
-    #warp_field.apply_deformation(strength=0,frequency=0)
-    #warp_field.b_spline_deformation(strength=0.07525205880031738,frequency=-5.903224673103456e-06)
-    control_points=initialize_control_points(radius=900, height=100, M=500, N=1000)
-    #control_points=np.random.rand(50,50,3)
-    warp_field.b_spline_mesh_deformation(control_points=control_points, strength=10)
-    #warp_field.apply_deformation_axis(strength=5,frequency=10)
-    
+   
+    image_points = extract_points_from_image(image_path)
+    control_point=np.random.rand(50,50,3)
+    #np.savetxt('control_points.txt', control_point.reshape(-1, 3))
 
-    # Extract points from the cylinder
+    #warp_field.b_spline_mesh_deformation(control_points=control_point, strength=10)
+    warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_point)
+    
     cylinder_points = warp_field.extract_pts()
     print(cylinder_points)
 
     projected_pts=projector.project_points(points_3d=cylinder_points)
 
     #print(projected_pts)
-    #print(warp_field.cylinder.points)
-    k=2.5
-    g_t=2.0
-    gamma=2.2
+    
+    # k=2.5
+    # g_t=2.0
+    # gamma=2.2
 
-    #precompute values for cylinder points and image points before doing the photometric projection
+    # #precompute values for cylinder points and image points before doing the photometric projection
 
 
-    # for point in cylinder_points:
-    #     for row in range(image.shape[0]):
-    #         for col in range(image.shape[1]):
-    #             u = image[row, col]
-    #             x,y,z=point
-    #             L=calib_p_model(x,y,z,k,g_t,gamma)
-    #             I=get_pixel_intensity(u)
-    #             C=cost_func(I,L)
-    #             print("Pixel intensity: ",I, "Cost function: ",C, "Light intensity: ",L)
+    # # for point in cylinder_points:
+    # #     for row in range(image.shape[0]):
+    # #         for col in range(image.shape[1]):
+    # #             u = image[row, col]
+    # #             x,y,z=point
+    # #             L=calib_p_model(x,y,z,k,g_t,gamma)
+    # #             I=get_pixel_intensity(u)
+    # #             C=cost_func(I,L)
+    # #             #print("Pixel intensity: ",I, "Cost function: ",C, "Light intensity: ",L)
       
        
  
@@ -148,7 +200,7 @@ def main():
     #visualize_point_cloud(cylinder_points)
     #point_cloud_to_mesh(cylinder_points)
     visualize_mesh_from_points(cylinder_points)
-    #visualize_point_cloud(cylinder_points)
+   
 
 
   

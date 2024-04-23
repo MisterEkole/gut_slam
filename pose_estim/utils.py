@@ -6,8 +6,10 @@ Date: 16-03-2024
 import numpy as np
 import open3d as o3d
 import pyvista as pv
+import scipy
 from scipy.optimize import least_squares
 from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline
+import scipy.special
 class WarpField:
     """
     Initialize the WarpField class with cylinder parameters.
@@ -85,67 +87,77 @@ class WarpField:
             densified_points = np.vstack((densified_points, repeated_points))
         self.cylinder.points = densified_points[:target_count]
 
-    def b_spline_mesh_deformation(self, control_points, strength=1.0):
+    def b_spline_mesh_deformation(self, control_points, strength=0.3):
         M, N, _ = control_points.shape
         heights = np.linspace(0, self.height, M)
-        #angles = np.linspace(0, 2*np.pi, N, endpoint=False)
-        angles=np.arange(0, 2*np.pi, 2*np.pi/N)
-        
+        angles = np.linspace(0, 2*np.pi, N, endpoint=False)
         cp_x = control_points[:, :, 0]
         cp_y = control_points[:, :, 1]
         cp_z = control_points[:, :, 2]
-        spline_x = RectBivariateSpline(heights, angles, cp_x)
-        spline_y = RectBivariateSpline(heights, angles, cp_y)
-        spline_z = RectBivariateSpline(heights, angles, cp_z)
+        spline_x = RectBivariateSpline(heights, angles, cp_x, s=10 )
+        spline_y = RectBivariateSpline(heights, angles, cp_y, s=10)
+        spline_z = RectBivariateSpline(heights, angles, cp_z, s=10)
         points=self.cylinder.points
         for i, point in enumerate(self.cylinder.points):
-            h = point[2]
+            h = point[2] 
             theta = np.arctan2(point[1] - self.center[1], point[0] - self.center[0]) % (2 * np.pi)
             new_x = spline_x(h, theta, grid=False)
             new_y = spline_y(h, theta, grid=False)
             new_z = spline_z(h, theta, grid=False)
-            point[0] = self.center[0] + (new_x - point[0]) * strength
-            point[1] = self.center[1] + (new_y - point[1]) * strength
-            point[2] = self.center[2] + (new_z - point[2]) * strength
+           
+            point[0] = new_x*strength
+            point[1] = new_y*strength
+            point[2] = new_z
+
         self.cylinder.points = points 
+    def b_mesh_deformation(self, a,b,control_points):
+        M, N, _ = control_points.shape
+        heights = np.linspace(0, self.height, M)
+        angles = np.linspace(0, 2*np.pi, N, endpoint=False)
+        
+
+        cp_x = control_points[:, :, 0]
+        cp_y = control_points[:, :, 1]
+        cp_z = control_points[:, :, 2]
+        spline_x = RectBivariateSpline(heights, angles, cp_x, s=50 )
+        spline_y = RectBivariateSpline(heights, angles, cp_y, s=50)
+        spline_z = RectBivariateSpline(heights, angles, cp_z, s=10)
+        deformed_pts=[]
+        for point in self.cylinder.points:
+            h=point[2]
+            theta=np.arctan2(point[1]-self.center[1],point[0]-self.center[0]) % (2*np.pi)
+            
+            deformed_x=0
+            deformed_y=0
+            deformed_z=0
+            alpha_max=np.mean(b)
+
+
+            for i in range(M):
+                B_i=(b/(2*np.pi))**i*(1-b/(2*np.pi))**(N-i)
+                B_i /= np.linalg.norm(B_i)
+                B_i = np.abs(B_i) 
+                #B_i = B_i[:, :, np.newaxis]
+                for j in range(N):
+                    B_j=(a / alpha_max) * (1 - a / alpha_max)**(N - j)
+                    
+                    B_j=np.abs(B_j)
+                    B_j/=np.linalg.norm(B_j)
+     
+
+                new_x = spline_x(h, theta, grid=False)
+                new_y = spline_y(h, theta, grid=False)
+                new_z = spline_z(h, theta, grid=False)
+                 
+                deformed_x += B_i * B_j * new_x*0.3
     
-    def b_spline_deformation(self, strength=None, frequency=None):
-        """
-        Apply B-Spline deformation to cylinder mesh to mimic complex deformations in the human gut.
+                deformed_y += B_i * B_j * new_y*0.3
+                    
+                deformed_z += B_i * B_j * new_z*0.3
+                    
 
-        Parameters:
-        - strength: Magnitude of the deformation.
-        - frequency: Influences the degree of spread of control points, affecting curvature."""
-
-        num_control_points=max(3,abs(frequency*2+1))
-        heights=np.linspace(0, self.height, int(num_control_points))
-        angles=np.linspace(0, 2*np.pi, int(num_control_points), endpoint=False)
-
-        #control point swirl around cylinder axis
-
-        control_points_x=self.center[0]+np.cos(angles)*strength+self.radius
-        control_points_y=self.center[1]+np.sin(angles)*strength+self.radius
-        control_points_z=self.center[2]+heights
-
-
-        #interpolating b-spline through control points
-        spline_x=make_interp_spline(control_points_z, control_points_x, bc_type='clamped')
-        spline_y=make_interp_spline(control_points_z, control_points_y, bc_type='clamped')
-
-        points=self.cylinder.points
-
-        for i, point in enumerate(points):
-            new_x=spline_x(point[2])
-            new_y=spline_y(point[2])
-
-            #apply deformation based on cylinder axis to simulate "bulging" effect
-
-            dist_from_axis=np.sqrt((point[0]-self.center[0])**2+(point[1]-self.center[1])**2)
-            deformation_scale=strength*dist_from_axis/self.radius
-
-            points[i][0]=(new_x-point[0])+deformation_scale
-            points[i][1]=(new_y-point[1])+deformation_scale
-        self.cylinder.points=points
+            deformed_pts.append([deformed_x,deformed_y,deformed_z])
+        self.cylinder.points=deformed_pts
     
 
 
