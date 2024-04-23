@@ -35,44 +35,6 @@ def initialize_control_points(radius, height, M, N):
 
     return control_points
 
-def initial_control_points(all_points, vp, height, width):
-    M, N = height, width
-    heights = np.linspace(0, 1, M)  # Assuming normalized heights for simplicity
-    control_points = np.zeros((M, N, 3))  # Initialize control points array
-
-    # Compute angles and control points
-    for i, point in enumerate(all_points):
-        p_minus_vp = point - vp
-        theta = np.arctan2(p_minus_vp[1], p_minus_vp[0])
-        h = np.linalg.norm(p_minus_vp)**2  # Squared norm as the 'height' metric
-        m_index = int(h * (M - 1))  # Map height to the closest index
-        n_index = int(((theta + np.pi) / (2 * np.pi)) * (N - 1))  # Map angle to index
-
-        # Assuming control points need to be set or adjusted here:
-        control_points[m_index, n_index, :] = point  # Place or modify the point at this control point location
-
-    return control_points
-
-def extract_points_from_image(image_path):
-    # Load image
-    img = Image.open(image_path).convert('L')  # Convert to grayscale
-    data = np.array(img)
-
-    # Extract points where brightness is above a threshold
-    threshold = 128  
-    points = np.column_stack(np.where(data > threshold))
-
-    # Normalize points based on image dimensions
-    height, width = data.shape
-    points = points / np.array([height, width])
-
-    # Append dummy z-coordinate if needed for compatibility
-    points = np.hstack([points, np.zeros((points.shape[0], 1))])
-
-    return points
-
-
-
 def main():
     #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
     image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
@@ -118,18 +80,18 @@ def main():
     print(a_values)
     print(b_values)
 
+    #init rot and trans mat
+    z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
+    z_unit_vector = z_vector / np.linalg.norm(z_vector) 
+    x_camera_vector = np.array([1, 0, 0])
+    y_vector = np.cross(z_unit_vector, x_camera_vector)
+    x_vector = np.cross(z_unit_vector, y_vector)
+    x_vector /= np.linalg.norm(x_vector)
+    y_vector /= np.linalg.norm(y_vector)
+    rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+    trans_mat=np.array([0, 0, 10])
 
-    # intrinsic_matrix = np.array([[735.37, 0, image_height/2],
-    #                          [0, 552.0, image_width/2],
-    #                          [0, 0, 1]])
 
-    # rot_mat = np.array([[1, 0, 0],   
-    #                         [0, 1, 0],
-    #                         [0, 0, 1]])
-
-    rot_mat=euler_to_rot_mat(yaw,pitch,roll)
-
-    trans_mat = np.array([0, 0, 0]) 
 
     
 
@@ -139,10 +101,8 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    # Apply deformation to the cylinder (optional)
-   
-    image_points = extract_points_from_image(image_path)
     control_point=np.random.rand(50,50,3)
+    #control_point=initialize_control_points(radius, height, 50, 50)
     #np.savetxt('control_points.txt', control_point.reshape(-1, 3))
 
     #warp_field.b_spline_mesh_deformation(control_points=control_point, strength=10)
