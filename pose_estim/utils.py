@@ -8,7 +8,7 @@ import open3d as o3d
 import pyvista as pv
 import scipy
 from scipy.optimize import least_squares
-from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline
+from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline,SmoothBivariateSpline
 import scipy.special
 class WarpField:
     """
@@ -114,14 +114,23 @@ class WarpField:
         M, N, _ = control_points.shape
         heights = np.linspace(0, self.height, M)
         angles = np.linspace(0, 2*np.pi, N, endpoint=False)
+
+        heights, angles=np.meshgrid(heights,angles)
+        heights=heights.ravel()
+        angles=angles.ravel()
+
         
 
-        cp_x = control_points[:, :, 0]
-        cp_y = control_points[:, :, 1]
-        cp_z = control_points[:, :, 2]
-        spline_x = RectBivariateSpline(heights, angles, cp_x, s=50 )
-        spline_y = RectBivariateSpline(heights, angles, cp_y, s=50)
-        spline_z = RectBivariateSpline(heights, angles, cp_z, s=10)
+        cp_x = control_points[:, :, 0].ravel()
+        cp_y = control_points[:, :, 1].ravel()
+        cp_z = control_points[:, :, 2].ravel()
+        # spline_x = RectBivariateSpline(heights, angles, cp_x, s=50 )
+        # spline_y = RectBivariateSpline(heights, angles, cp_y, s=0.2)
+        # spline_z = RectBivariateSpline(heights, angles, cp_z, s=20)
+
+        spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N)
+        spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N)
+        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N)
         deformed_pts=[]
         for point in self.cylinder.points:
             h=point[2]
@@ -134,31 +143,31 @@ class WarpField:
 
 
             for i in range(M):
-                B_i=(b/(2*np.pi))**i*(1-b/(2*np.pi))**(N-i)
-                B_i /= np.linalg.norm(B_i)
-                B_i = np.abs(B_i) 
-                #B_i = B_i[:, :, np.newaxis]
+              
+                B_i=(b/(2*np.pi))**i*(1-b/(2*np.pi))**(N-i) #influence def of control points
+              
+              
+                
                 for j in range(N):
-                    B_j=(a / alpha_max) * (1 - a / alpha_max)**(N - j)
-                    
-                    B_j=np.abs(B_j)
-                    B_j/=np.linalg.norm(B_j)
-     
+                    B_j=(a / alpha_max) * (1 - a / alpha_max)**(N - j) #influence deformation of control points
+               
 
+                B_i /= np.linalg.norm(B_i)
+                B_j /= np.linalg.norm(B_j)
                 new_x = spline_x(h, theta, grid=False)
                 new_y = spline_y(h, theta, grid=False)
                 new_z = spline_z(h, theta, grid=False)
                  
-                deformed_x += B_i * B_j * new_x*0.3
+                deformed_x += B_i * B_j*new_x*0.8
     
-                deformed_y += B_i * B_j * new_y*0.3
+                deformed_y += B_i * B_j *new_y*0.8
                     
-                deformed_z += B_i * B_j * new_z*0.3
+                deformed_z += B_i *B_j *new_z*0.8
                     
 
             deformed_pts.append([deformed_x,deformed_y,deformed_z])
         self.cylinder.points=deformed_pts
-    
+   
 
 
 

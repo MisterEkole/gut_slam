@@ -101,9 +101,15 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    control_point=np.random.rand(50,50,3)
+    #control_point=np.random.rand(30,30,3)
+    #print(control_point.shape)
+    control_point=np.loadtxt('control_points.txt')
+  
+    control_point=control_point.reshape(30,30,3)
     #control_point=initialize_control_points(radius, height, 50, 50)
-    #np.savetxt('control_points.txt', control_point.reshape(-1, 3))
+    # control_point_reshaped=control_point.reshape(-1,3)
+    # print(control_point_reshaped.shape)
+    # np.savetxt('control_points.txt', control_point_reshaped)
 
     #warp_field.b_spline_mesh_deformation(control_points=control_point, strength=10)
     warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_point)
