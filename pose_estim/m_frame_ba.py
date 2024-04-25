@@ -189,7 +189,7 @@ def log_optim_params(optimized_params, frame_idx):
 
 
 def main():
-    frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S1'
+    frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S2'
     print("Optimization started...")
     start_time=time.time()
     #frames_directory = '/Users/ekole/Dev/gut_slam/gut_images'
@@ -231,7 +231,7 @@ def main():
         if frame_idx == 0:
             a_init=np.mean(a_values.ravel())
             b_init=np.mean(b_values.ravel())
-            
+           
             warp_field.b_mesh_deformation(a=a_init, b=b_init, control_points=control_points)
         else:
            
@@ -270,6 +270,7 @@ def main():
         if frame_idx == 0:
             a_init=np.mean(a_values.ravel())
             b_init=np.mean(b_values.ravel())
+           
             
             initial_lamda_ortho = 0
             initial_lamda_det = 0
