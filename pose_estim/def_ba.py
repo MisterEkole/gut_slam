@@ -14,14 +14,30 @@ from utils import WarpField, Project3D_2D_cam, calib_p_model, cost_func, get_pix
 import matplotlib.pyplot as plt
 
 
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, M,N, control_points):
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    deformation_strength = params[12]
-    deformation_frequency = params[13]
+    #a=params[12:(12*M*N)].reshape(M,N)
+    #b=params[(12*M*N):].reshape(M,N)
+
+    num_params_for_a = M * N  
+    num_params_for_b = M * N  
+
+   
+    a_start_index = 12
+    a_end_index = a_start_index + num_params_for_a
+    b_start_index = a_end_index
+    b_end_index = b_start_index + num_params_for_b
+
+    a = params[a_start_index:a_end_index].reshape(M, N)
+    b = params[b_start_index:b_end_index].reshape(M, N)
+    #deformation_strength = params[12]
+    #deformation_frequency = params[13]
+
     
     # Update deformation parameters
-    warp_field.apply_deformation_axis(strength=deformation_strength, frequency=deformation_frequency)
+    #warp_field.apply_deformation_axis(strength=deformation_strength, frequency=deformation_frequency)
+    warp_field.b_mesh_deformation(a=a, b=b, control_points=control_points)
     points_3d_deformed = warp_field.extract_pts()
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
@@ -53,10 +69,10 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     #print(" The error is : ", np.mean(normalize_errors)) 
     return normalize_errors  #outputs the mean error of the normalised error array
 
-def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field):
+def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,M,N,control_points):
     result = least_squares(objective_function, 
                            initial_params,
-                         args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
+                         args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field,M,N,control_points),
                          method='lm', max_nfev=1000, gtol=1e-6)
     return result.x
 
@@ -87,6 +103,33 @@ def main():
     center = image_center
     resolution = 100
 
+    a_values = np.zeros((image_height, image_width, 3)) 
+    b_values = np.zeros((image_height, image_width))  
+    
+
+    
+    for row in range(image_height):
+        for col in range(image_width):
+            pixel = image[row, col]
+            p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
+            a_values[row, col] = p_minus_vp
+            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
+
+           
+    
+    # a_values=np.array(a_values)
+    # a_values=np.max(a_values/(np.linalg.norm(np.mean(a_values,axis=1))))
+    # b_values=np.array(b_values)
+    # b_values=np.max(b_values/(np.linalg.norm(b_values)))
+    a_values = a_values / np.linalg.norm(np.mean(a_values, axis=1), axis=1, keepdims=True)
+    b_values = b_values / np.linalg.norm(b_values)
+
+
+    M,N=a_values.shape[:2]
+    a_init=a_values.ravel()
+    b_init=b_values.ravel()
+
+
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
     warp_field.apply_deformation_axis(strength=5, frequency=10)
 
@@ -108,21 +151,15 @@ def main():
     k = 2.5
     g_t = 2.0
     gamma = 2.2
-
-
-    # Initial deformation parameters
-    initial_deformation_strength = np.random.rand() 
-    initial_deformation_frequency = np.random.rand() 
-
-    print("Initial Defomation Strength: ", initial_deformation_strength)
-    print("Initial Defomation Frequency: ", initial_deformation_frequency) 
+    control_points=np.loadtxt('control_points.txt')
+    control_points=control_points.reshape(30,30,3)
 
 
     # Adjust initial_params to include deformation parameters
-    initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), initial_deformation_strength, initial_deformation_frequency])
+    initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), a_init, b_init])
 
     # Optimization call
-    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field)
+    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,M,N, control_points)
 
 
     plt.imshow(image)
@@ -136,10 +173,14 @@ def main():
 
 
     # Output optimized parameters
-    optimized_deformation_strength = optimized_params[12]
-    optimized_deformation_frequency = optimized_params[13]
-    print("Optimized Deformation Strength: ", optimized_deformation_strength)
-    print("Optimized Deformation Frequency: ", optimized_deformation_frequency)
+    optimized_a = optimized_params[12:(12+M*N)].reshape(M, N)
+    optimized_b = optimized_params[(12+M*N):].reshape(M, N)
+
+    np.savetxt('optimized_a.txt', optimized_a)
+    np.savetxt('optimized_b.txt', optimized_b)
+    optimized_points_3d_deformed = warp_field.extract_pts()
+    np.savetxt('optimized_deformed_points.txt', optimized_points_3d_deformed)
+
 
   
 
