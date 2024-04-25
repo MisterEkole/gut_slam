@@ -67,15 +67,15 @@ optimization_errors=[]
 
 
 
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det, control_points):
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    deformation_strength = params[12]
-    deformation_frequency = params[13]
+    a_params=params[12]
+    b_params=params[13]
+
     
-    # Update deformation parameters
-    warp_field.b_spline_deformation(strength=deformation_strength, frequency=deformation_frequency)
+    warp_field.b_mesh_deformation(a=a_params, b=b_params, control_points=control_points)
     points_3d_deformed = warp_field.extract_pts()
     
     # Project points
@@ -127,29 +127,25 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     return objective
 
 
-
-
-
-def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
+def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,  control_points):
     global optimization_errors
     optimization_errors = []
-    lower_bounds = [-np.inf] * 9 + [-np.inf, -np.inf, -np.inf] + [0, 0] + [0, 0]  # Lower bounds, including non-negative constraints for the Lagrange multipliers
-    upper_bounds = [np.inf] * 9 + [np.inf, np.inf, np.inf] + [np.inf, np.inf] + [np.inf, np.inf]  # Upper bounds
+    lower_bounds = [-np.inf]*14 + [0, 0]  # Assuming non-negative values for the Lagrange multipliers
+    upper_bounds = [np.inf]*14 + [np.inf, np.inf]
 
-
+    # Perform optimization
     result = least_squares(
         objective_function,
         initial_params,
-        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1),  
-        method='trf',  # Trust Region Reflective algorithm
-        bounds=(lower_bounds, upper_bounds),  # Apply bounds
-        max_nfev=1000, 
-        gtol=1e-6,
+        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1, control_points),#1,1 lambda ortho, lambda det init
+        method='trf',
+        bounds=(lower_bounds, upper_bounds),
+        max_nfev=1000,
+        gtol=1e-8,
         tr_solver='lsmr'
     )
     
     log_errors(optimization_errors, frame_idx)
-
     return result.x
 
 
@@ -165,9 +161,9 @@ def log_errors(errors, frame_idx):
         f.write(f"Mean Photometric Error: {mean_photometric_error:.4f}\n\n")  
 
      
-def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, warp_field, frame_idx):
+def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, warp_field, frame_idx,control_points):
     points_2d_observed = Project3D_2D_cam(intrinsic_matrix, initial_params[:9].reshape(3, 3), initial_params[9:12]).project_points(points_3d)
-    optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field)
+    optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,control_points)
     return optimized_params
 def detect_feature_points(image):
     orb = cv2.ORB_create()
@@ -183,10 +179,15 @@ def log_optim_params(optimized_params, frame_idx):
         f.write(str(optimized_params[:9].reshape(3, 3)) + "\n")
         f.write("Translation Vector: \n")
         f.write(str(optimized_params[9:12]) + "\n")
-        f.write("Deformation Strength: ")
+        f.write("Optimized a_val: ")
         f.write(str(optimized_params[12]) + "\n")
-        f.write("Deformation Frequency: ")
+        f.write("Optimized b_val: ")
         f.write(str(optimized_params[13]) + "\n\n")
+        f.write("Lambda Ortho: ")
+        f.write(str(optimized_params[14]) + "\n")
+        f.write("Lambda Det: ")
+        f.write(str(optimized_params[15]) + "\n\n")
+       
 
 
 
@@ -207,6 +208,30 @@ def main():
     vanishing_pts = (0, 0, 10)
     center = image_center
     resolution = 100
+    a_values = np.zeros((image_height, image_width, 3)) 
+    b_values = np.zeros((image_height, image_width))  
+    
+
+    
+    for row in range(image_height):
+        for col in range(image_width):
+            pixel = image[row, col]
+            p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
+            a_values[row, col] = p_minus_vp
+            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
+
+           
+    a_values = a_values / np.linalg.norm(np.mean(a_values, axis=1), axis=1, keepdims=True)
+    b_values = b_values / np.linalg.norm(b_values)
+
+
+    M,N=a_values.shape[:2]
+    a_init=np.mean(a_values.ravel())
+    b_init=np.mean(b_values.ravel())
+
+    print(a_init,b_init)
+
+
 
     points_2d_observed = detect_feature_points(image)
 
@@ -228,20 +253,20 @@ def main():
     k = 2.5
     g_t = 2.0
     gamma = 2.2
-
-    initial_deformation_strength = 1
-    initial_deformation_frequency = 1
     init_lambda_ortho = 1
     init_lambda_det = 1
+    control_points=np.loadtxt('control_points.txt')
+    control_points=control_points.reshape(30,30,3)
+    #control_points=np.random.rand(10,10,3)
 
-    initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), initial_deformation_strength, initial_deformation_frequency,init_lambda_ortho,init_lambda_det])
-    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, 0)
+    initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), a_init, b_init,init_lambda_ortho,init_lambda_det])
+    #print(len(initial_params))
+ 
+    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,frame_idx=0,control_points=control_points)
 
-    #optimized_deformation_strength = optimized_params[12]
-    #optimized_deformation_frequency = optimized_params[13]
 
     log_optim_params(optimized_params, 0)
-    print(points_2d_observed.shape)
+    #print(points_2d_observed.shape)
 
     end_time = time.time()
     total_time = end_time - start_time

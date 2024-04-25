@@ -153,19 +153,22 @@ class WarpField:
                
 
                 B_i /= np.linalg.norm(B_i)
+                
                 B_j /= np.linalg.norm(B_j)
+               
                 new_x = spline_x(h, theta, grid=False)
                 new_y = spline_y(h, theta, grid=False)
                 new_z = spline_z(h, theta, grid=False)
                  
-                deformed_x += B_i * B_j*new_x*0.8
+                deformed_x += B_i*B_j*new_x
     
-                deformed_y += B_i * B_j *new_y*0.8
+                deformed_y += B_i*B_j*new_y
                     
-                deformed_z += B_i *B_j *new_z*0.8
+                deformed_z +=  B_i*B_j*new_z
                     
 
             deformed_pts.append([deformed_x,deformed_y,deformed_z])
+       
         self.cylinder.points=deformed_pts
    
 
