@@ -162,7 +162,6 @@ def main():
     # plotter.add_title("Deformable Cylinder Visualization")
     # plotter.show()
 
-    #display_point_cloud(cylinder_points)
     #visualize_point_cloud(cylinder_points)
     #point_cloud_to_mesh(cylinder_points)
     visualize_mesh_from_points(cylinder_points)
