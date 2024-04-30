@@ -8,8 +8,10 @@ import open3d as o3d
 import pyvista as pv
 import scipy
 from scipy.optimize import least_squares
-from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline,SmoothBivariateSpline
+from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline,SmoothBivariateSpline,interp2d
 import scipy.special
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 class WarpField:
     """
     Initialize the WarpField class with cylinder parameters.
@@ -87,39 +89,15 @@ class WarpField:
             densified_points = np.vstack((densified_points, repeated_points))
         self.cylinder.points = densified_points[:target_count]
 
-    def b_spline_mesh_deformation(self, control_points, strength=0.3):
-        M, N, _ = control_points.shape
-        heights = np.linspace(0, self.height, M)
-        angles = np.linspace(0, 2*np.pi, N, endpoint=False)
-        cp_x = control_points[:, :, 0]
-        cp_y = control_points[:, :, 1]
-        cp_z = control_points[:, :, 2]
-        spline_x = RectBivariateSpline(heights, angles, cp_x, s=10 )
-        spline_y = RectBivariateSpline(heights, angles, cp_y, s=10)
-        spline_z = RectBivariateSpline(heights, angles, cp_z, s=10)
-        points=self.cylinder.points
-        for i, point in enumerate(self.cylinder.points):
-            h = point[2] 
-            theta = np.arctan2(point[1] - self.center[1], point[0] - self.center[0]) % (2 * np.pi)
-            new_x = spline_x(h, theta, grid=False)
-            new_y = spline_y(h, theta, grid=False)
-            new_z = spline_z(h, theta, grid=False)
-           
-            point[0] = new_x*strength
-            point[1] = new_y*strength
-            point[2] = new_z
-
-        self.cylinder.points = points 
+ 
     def b_mesh_deformation(self, a,b,control_points):
         M, N, _ = control_points.shape
         heights = np.linspace(0, self.height, M)
-        angles = np.linspace(0, 2*np.pi, N, endpoint=False)
+        angles = np.linspace(0, 2*np.pi, N, endpoint=True)
 
         heights, angles=np.meshgrid(heights,angles)
         heights=heights.ravel()
         angles=angles.ravel()
-
-        
 
         cp_x = control_points[:, :, 0].ravel()
         cp_y = control_points[:, :, 1].ravel()
@@ -127,49 +105,98 @@ class WarpField:
        
 
         spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N/20)
-        print(M*N)
         spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N/20)
         spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N/20)
-        deformed_pts=[]
+        pts=[]
         for point in self.cylinder.points:
             h=point[2]
             theta=np.arctan2(point[1]-self.center[1],point[0]-self.center[0]) % (2*np.pi)
             
-            deformed_x=0
-            deformed_y=0
-            deformed_z=0
-            alpha_max=np.mean(b)
+            x=0
+            y=0
+            z=0
+            alpha_max=np.max(b)
+          
 
 
             for i in range(M):
               
-                B_i=(b/(2*np.pi))**i*(1-b/(2*np.pi))**(N-i) #influence def of control points
-              
-              
-                
+                B_i[i]=(b/(2*np.pi))**i*(1-b/(2*np.pi))**(N-i) #influence def of control points
+                B_i /= np.linalg.norm(B_i,ord=1)
                 for j in range(N):
                     B_j=(a / alpha_max) * (1 - a / alpha_max)**(N - j) #influence deformation of control points
-               
+                    B_j /= np.linalg.norm(B_j,ord=1)
+                    weight=B_i[i]+B_j[j]
 
-                B_i /= np.linalg.norm(B_i)
-                
-                B_j /= np.linalg.norm(B_j)
-               
-                new_x = spline_x(h, theta, grid=False)
-                new_y = spline_y(h, theta, grid=False)
-                new_z = spline_z(h, theta, grid=False)
-                 
-                deformed_x += B_i*new_x
+                new_x = weight*spline_x.ev(h, theta)
+                new_y = weight*spline_y.ev(h, theta)
+                new_z = weight*spline_z.ev(h, theta)
+  
+                x += new_x
     
-                deformed_y += B_j*new_y
+                y += new_y
                     
-                deformed_z +=  B_i*B_j
+                z +=new_z
+
                     
 
-            deformed_pts.append([deformed_x,deformed_y,deformed_z])
+            pts.append([x,y,z])
        
-        self.cylinder.points=deformed_pts
+        self.cylinder.points=pts
+
    
+    def b_mesh_deformation3(self, a, b, control_points):
+        M, N, _ = control_points.shape
+        heights = np.linspace(0, self.height, M)
+        angles = np.linspace(0, 2 * np.pi, N, endpoint=True)
+
+        heights, angles = np.meshgrid(heights, angles)
+        heights = heights.ravel()
+        angles = angles.ravel()
+        cp_x = control_points[:, :, 0].ravel()
+        cp_y = control_points[:, :, 1].ravel()
+        cp_z = control_points[:, :, 2].ravel()
+
+    
+        spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N/20)
+        spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N/20)
+        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N/20)
+  
+        pts = []
+        for point in self.cylinder.points:
+            h = point[2]
+            theta = np.arctan2(point[1] - self.center[1], point[0] - self.center[0]) % (2 * np.pi)
+        
+            x = y = z = 0 
+            B_i = np.zeros(M)
+            B_j = np.zeros(N)
+
+            for i in range(M):
+                B_i[i] = (b / (2 * np.pi)) ** i * (1 - b / (2 * np.pi)) ** (M - i)
+               
+               
+                for j in range(N):
+                    B_j[j] = (a / np.max(b)) * (1 - a / np.max(b)) ** (N - j)
+                    
+
+                B_i /= np.linalg.norm(B_i, ord=2)  
+                B_j /= np.linalg.norm(B_j, ord=2)  
+
+       
+            for i in range(M):
+                for j in range(N):
+                    weight = B_i[i] * B_j[j]  
+
+               
+                    x += weight * spline_x.ev(h, theta)
+                    y += weight * spline_y.ev(h, theta)
+                    z += weight * spline_z.ev(h, theta)
+
+            pts.append([x, y, z])  
+
+        self.cylinder.points = np.array(pts)  
+
+  
 
 
 
@@ -334,6 +361,23 @@ def calib_p_model(x,y,z,k,g_t,gamma):
     L=(mu/cent_to_pix)*fr_thetha*np.cos(thetha)*g_t
     L=np.power(np.abs(L),gamma)
     return L
+
+# def calib_p_model(x, y, z, k, g_t, gamma):
+#     mu = light_spread_func(z, k)
+#     fr_thetha = 1 / np.pi
+#     cent_to_pix = np.linalg.norm(np.array([x, y, z]))
+#     if cent_to_pix == 0:
+#         return 1  # Early return to avoid division by zero
+
+#     norm_xy = np.linalg.norm(np.array([x, y]))
+#     #print(norm_xy, cent_to_pix)
+#     if norm_xy > cent_to_pix:
+#         norm_xy = cent_to_pix  # Correct potential rounding errors
+#     thetha = 2 * (np.arccos(norm_xy / cent_to_pix)) / np.pi
+
+#     L = (mu / cent_to_pix) * fr_thetha * np.cos(thetha) * g_t
+#     L = np.power(np.abs(L), gamma)
+#     return L
 
 def cost_func(I,L,sigma=1e-3):
     '''Computes the cost function for the photometric model'''
@@ -636,7 +680,7 @@ def point_cloud_to_mesh(points):
     
     # Estimate normals if they are not already present
     if not pcd.has_normals():
-        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=30))
+        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=1000))
     
     # Use the Ball Pivoting algorithm (BPA) to reconstruct the mesh
     radii = [10, 100, 100, 100]  # Set radii for ball pivoting, adjust based on your point cloud density
@@ -661,12 +705,50 @@ def visualize_mesh_from_points(points):
     # Create a PyVista point cloud object
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
-    
-    # Visualize the mesh
+    mesh=mesh.smooth(n_iter=500)
+    scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
+  
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, color='blue', show_edges=True)
+    #plotter.add_mesh(mesh,show_edges=True,style='surface',multi_colors=True)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
     #plotter.add_points(points, color='red')  # Optionally add the original points on top
     plotter.show()
+def plot_3d_mesh_on_image(points_file, image_file):
+    points = np.loadtxt(points_file, delimiter=',')  # Adjust delimiter based on file format
 
+    points = np.unique(points, axis=0)
+    cloud = pv.PolyData(points)
 
+    try:
+        mesh = cloud.delaunay_2d()
+    except Exception as e:
+        print(f"Failed to create a mesh: {e}")
+        return
 
+    if mesh.n_faces == 0:
+        print("No faces created in the mesh. Check the point data quality and distribution.")
+        return
+
+  
+    image = mpimg.imread(image_file)
+
+    fig, ax = plt.subplots()
+    ax.imshow(image)
+    ax.set_axis_off()
+
+   
+    x, y, _ = mesh.points.T
+    ax.scatter(x, y, color='red', s=1) 
+    try:
+        if mesh.faces.shape[1] == 4:
+            for f in mesh.faces.reshape(-1, 4):
+                v0, v1, v2 = f[1], f[2], f[3]
+                ax.plot(mesh.points[[v0, v1, v2, v0], 0], mesh.points[[v0, v1, v2, v0], 1], color='blue')
+        else:
+            print("Unexpected cell format in mesh")
+    except AttributeError:
+        print("Mesh faces are not in expected format. Possibly no valid mesh was created.")
+    except IndexError:
+        print("Error accessing mesh data. Check the integrity of the mesh structure.")
+
+    plt.show()

@@ -308,12 +308,6 @@ def main():
         # Optional: Visualize  the optimized results for each frame
         # print(f"Optimization time for frame {frame_idx}: {optim_time:.2f} seconds")
 
-        # print(f"Frame {frame_idx}: Optimized Parameters:")
-        # print("Rotation Matrix: \n",optimized_params[:9].reshape(3, 3))
-        # #print("Optimized Rotation Vector: \n", rotation_matrix_to_vector(optimized_params[:9].reshape(3, 3)))
-        # print("Optimized Translation Vector: \n", optimized_params[9:12])
-        # print("Optimized Deformation Strength: ", optimized_deformation_strength)
-        # print("Optimized Deformation Frequency: ", optimized_deformation_frequency)
     end_time=time.time()
     total_time=end_time-start_time
     print(f"Total execution time: {total_time:.2f} seconds")

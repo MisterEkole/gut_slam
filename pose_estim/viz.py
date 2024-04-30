@@ -36,8 +36,8 @@ def initialize_control_points(radius, height, M, N):
     return control_points
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
-    #image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+    #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     image = cv2.imread(image_path)
     yaw=np.radians(0)
     pitch=np.radians(0)
@@ -119,7 +119,7 @@ def main():
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
     #print(control_point.shape)
-    control_points=np.loadtxt('control_points5.txt')
+    control_points=np.loadtxt('optimized_control_points.txt')
   
     control_points=control_points.reshape(5,5,3)
     #control_point=initialize_control_points(radius, height, 50, 50)
