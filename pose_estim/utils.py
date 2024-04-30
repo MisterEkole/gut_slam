@@ -641,6 +641,29 @@ def visualize_mesh_from_points(points):
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
     #plotter.add_points(points, color='red')  # Optionally add the original points on top
     plotter.show()
+    
+
+def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
+    """
+    Creates, visualizes, and saves a mesh from a given set of points using PyVista.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    - filename: String, the path and file name to save the mesh. The format is inferred from the extension.
+    - screenshot: Optional string, the path and file name to save a screenshot of the plot.
+    """
+   
+    cloud = pv.PolyData(points)
+
+    mesh = cloud.delaunay_2d()
+    mesh = mesh.smooth(n_iter=600)
+    scalars = mesh.points[:, 2]
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
+    plotter.add_scalar_bar(title="Scene Deformation", label_font_size=10, title_font_size=10)
+    plotter.show(screenshot=screenshot)
+    mesh.save(filename)
+
 def plot_3d_mesh_on_image(points_file, image_file):
     points = np.loadtxt(points_file, delimiter=',')  # Adjust delimiter based on file format
 

@@ -127,7 +127,8 @@ def main():
 
     #visualize_point_cloud(cylinder_points)
     #point_cloud_to_mesh(cylinder_points)
-    visualize_mesh_from_points(cylinder_points)
+    #visualize_mesh_from_points(cylinder_points)
+    visualize_and_save_mesh_from_points(cylinder_points,'./mesh.vtk',screenshot='./mesh.png')
 
     #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)
    
