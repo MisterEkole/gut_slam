@@ -602,24 +602,23 @@ def point_cloud_to_mesh(points):
     Parameters:
     - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
     """
-    # Create a point cloud object from the points
+   
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     
-    # Estimate normals if they are not already present
+
     if not pcd.has_normals():
         pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=1000))
     
-    # Use the Ball Pivoting algorithm (BPA) to reconstruct the mesh
-    radii = [10, 100, 100, 100]  # Set radii for ball pivoting, adjust based on your point cloud density
+   
+    radii = [10, 100, 100, 100]  
     bpa_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
                    pcd,
                    o3d.utility.DoubleVector(radii))
     
-    # Optionally, simplify the mesh
-    dec_mesh = bpa_mesh.simplify_quadric_decimation(target_number_of_triangles=1000)
     
-    # Visualize the mesh
+    dec_mesh = bpa_mesh.simplify_quadric_decimation(target_number_of_triangles=1000)
+   
     o3d.visualization.draw_geometries([dec_mesh], window_name="Mesh Visualization")
 
 
@@ -678,10 +677,9 @@ def visualize_mesh_on_image(points, filename):
     scalars = mesh.points[:, 2]
     
     plotter = pv.Plotter()
-    #plotter.add_mesh(mesh, color='white', show_edges=True)
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
     
-    # Set up camera position to simulate a 2D projection
+    
     plotter.camera.position = (0, 0, 10)
     plotter.camera.focal_point = (0, 0, 0)
     plotter.camera.up = (0, 1, 0)
