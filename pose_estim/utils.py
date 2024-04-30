@@ -664,6 +664,34 @@ def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     plotter.show(screenshot=screenshot)
     mesh.save(filename)
 
+def visualize_mesh_on_image(points, filename):
+    """
+    Creates a 3D mesh from points and captures a 2D projection as an image.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    - filename: String, the file name to save the screenshot.
+    """
+    cloud = pv.PolyData(points)
+    mesh = cloud.delaunay_2d()
+    mesh = mesh.smooth(n_iter=600)
+    scalars = mesh.points[:, 2]
+    
+    plotter = pv.Plotter()
+    #plotter.add_mesh(mesh, color='white', show_edges=True)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
+    
+    # Set up camera position to simulate a 2D projection
+    plotter.camera.position = (0, 0, 10)
+    plotter.camera.focal_point = (0, 0, 0)
+    plotter.camera.up = (0, 1, 0)
+
+    plotter.show_axes = False
+    plotter.background_color = 'white'
+    
+    
+    plotter.show(screenshot=filename)
+
 def plot_3d_mesh_on_image(points_file, image_file):
     points = np.loadtxt(points_file, delimiter=',')  # Adjust delimiter based on file format
 
