@@ -79,7 +79,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
    
 
     
-    warp_field.b_mesh_deformation3(a=a, b=b, control_points=control_points)
+    warp_field.b_mesh_deformation(a=a, b=b, control_points=control_points)
     points_3d_deformed = warp_field.extract_pts()
     
     # Project points
@@ -243,7 +243,7 @@ def main():
 
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
     #warp_field.save_pts('./cylinder_points.txt')
-    warp_field.b_mesh_deformation3(a=a_init, b=b_init,control_points=control_points)
+    warp_field.b_mesh_deformation(a=a_init, b=b_init,control_points=control_points)
     cylinder_points = warp_field.extract_pts()
 
     z_vector = np.array([0, 0, 10])

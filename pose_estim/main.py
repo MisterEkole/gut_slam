@@ -5,49 +5,15 @@ from utils import *
 import matplotlib.pyplot as plt
 from PIL import Image
 
-def initialize_control_points(radius, height, M, N):
-    """
-    Initialize a grid of control points on the surface of a cylinder.
-    
-    Parameters:
-    - radius: The radius of the cylinder.
-    - height: The height of the cylinder.
-    - M: Number of vertical control points (height divisions).
-    - N: Number of circumferential control points (angular divisions).
-    
-    Returns:
-    - control_points: A numpy array of shape (M, N, 3).
-    """
-    # Define the heights and angles
-    heights = np.linspace(0, height, M)
-    angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
-
-    # Create meshgrid for heights and angles
-    heights_grid, angles_grid = np.meshgrid(heights, angles, indexing='ij')
-
-    # Calculate x, y, z positions
-    x_positions = radius * np.cos(angles_grid)
-    y_positions = radius * np.sin(angles_grid)
-    z_positions = heights_grid
-
-    # Stack the positions into a 3D array
-    control_points = np.stack((x_positions, y_positions, z_positions), axis=-1)
-
-    return control_points
 
 def main():
     image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
     #image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     image = cv2.imread(image_path)
-    yaw=np.radians(0)
-    pitch=np.radians(0)
-    roll=np.radians(0)
+    
     if image is None:
         print("Error: Image not found.")
         return
-    
-
-
 
     image_height, image_width = image.shape[:2]
     image_center = (image_width / 2, image_height / 2, 0)
@@ -78,9 +44,6 @@ def main():
     b_values=np.array(b_values)
     b_values=np.max(b_values/(np.linalg.norm(b_values)))
 
-    # print(a_values)
-    # print(b_values)
-
     #init rot and trans mat
     z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
     z_unit_vector = z_vector / np.linalg.norm(z_vector) 
@@ -101,20 +64,7 @@ def main():
     image_height, image_width, rot_mat, trans_mat)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-    # M,N=30,30
-    # control_points=np.zeros((M,N,3))
-    # #set x and y of contront points assume uniform grid
-    # control_points[:, :, 0] = np.linspace(0, 1, N)[None, :]
-    # control_points[:, :, 1] = np.linspace(0, 1, M)[:, None]
-    # amp=3
-    # freq=30
-    # for i in range(M):
-    #     for j in range(N):
-    #         control_points[i, j, 2] = amp * np.sin(freq * 2 * np.pi * control_points[i, j, 0])
     
-    # rand_disp=0.05
-    # control_points[:, :, 2] += rand_disp * np.random.randn(M, N)
-
     
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
@@ -122,15 +72,10 @@ def main():
     control_points=np.loadtxt('control_points5.txt')
   
     control_points=control_points.reshape(5,5,3)
-    #control_point=initialize_control_points(radius, height, 50, 50)
-    # control_point_reshaped=control_point.reshape(-1,3)
-    # print(control_point_reshaped.shape)
-    # np.savetxt('control_points.txt', control_point_reshaped)
+    
 
-
-    warp_field.b_mesh_deformation3(a=a_values, b=b_values, control_points=control_points)
-    #warp_field.b_mesh_deformation2(control_points=control_points)
-    #warp_field.save_pts('./def_cylinder_points.txt')
+    warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_points)
+    
     
     cylinder_points = warp_field.extract_pts()
     print(cylinder_points)

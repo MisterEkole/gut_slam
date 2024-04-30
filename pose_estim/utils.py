@@ -89,63 +89,8 @@ class WarpField:
             densified_points = np.vstack((densified_points, repeated_points))
         self.cylinder.points = densified_points[:target_count]
 
- 
-    def b_mesh_deformation(self, a,b,control_points):
-        M, N, _ = control_points.shape
-        heights = np.linspace(0, self.height, M)
-        angles = np.linspace(0, 2*np.pi, N, endpoint=True)
-
-        heights, angles=np.meshgrid(heights,angles)
-        heights=heights.ravel()
-        angles=angles.ravel()
-
-        cp_x = control_points[:, :, 0].ravel()
-        cp_y = control_points[:, :, 1].ravel()
-        cp_z = control_points[:, :, 2].ravel()
-       
-
-        spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N/20)
-        spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N/20)
-        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N/20)
-        pts=[]
-        for point in self.cylinder.points:
-            h=point[2]
-            theta=np.arctan2(point[1]-self.center[1],point[0]-self.center[0]) % (2*np.pi)
-            
-            x=0
-            y=0
-            z=0
-            alpha_max=np.max(b)
-          
-
-
-            for i in range(M):
-              
-                B_i[i]=(b/(2*np.pi))**i*(1-b/(2*np.pi))**(N-i) #influence def of control points
-                B_i /= np.linalg.norm(B_i,ord=1)
-                for j in range(N):
-                    B_j=(a / alpha_max) * (1 - a / alpha_max)**(N - j) #influence deformation of control points
-                    B_j /= np.linalg.norm(B_j,ord=1)
-                    weight=B_i[i]+B_j[j]
-
-                new_x = weight*spline_x.ev(h, theta)
-                new_y = weight*spline_y.ev(h, theta)
-                new_z = weight*spline_z.ev(h, theta)
-  
-                x += new_x
-    
-                y += new_y
-                    
-                z +=new_z
-
-                    
-
-            pts.append([x,y,z])
-       
-        self.cylinder.points=pts
-
    
-    def b_mesh_deformation3(self, a, b, control_points):
+    def b_mesh_deformation(self, a, b, control_points):
         M, N, _ = control_points.shape
         heights = np.linspace(0, self.height, M)
         angles = np.linspace(0, 2 * np.pi, N, endpoint=True)
@@ -361,23 +306,6 @@ def calib_p_model(x,y,z,k,g_t,gamma):
     L=(mu/cent_to_pix)*fr_thetha*np.cos(thetha)*g_t
     L=np.power(np.abs(L),gamma)
     return L
-
-# def calib_p_model(x, y, z, k, g_t, gamma):
-#     mu = light_spread_func(z, k)
-#     fr_thetha = 1 / np.pi
-#     cent_to_pix = np.linalg.norm(np.array([x, y, z]))
-#     if cent_to_pix == 0:
-#         return 1  # Early return to avoid division by zero
-
-#     norm_xy = np.linalg.norm(np.array([x, y]))
-#     #print(norm_xy, cent_to_pix)
-#     if norm_xy > cent_to_pix:
-#         norm_xy = cent_to_pix  # Correct potential rounding errors
-#     thetha = 2 * (np.arccos(norm_xy / cent_to_pix)) / np.pi
-
-#     L = (mu / cent_to_pix) * fr_thetha * np.cos(thetha) * g_t
-#     L = np.power(np.abs(L), gamma)
-#     return L
 
 def cost_func(I,L,sigma=1e-3):
     '''Computes the cost function for the photometric model'''
