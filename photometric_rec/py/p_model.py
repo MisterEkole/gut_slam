@@ -1,7 +1,11 @@
-''' Photometric model for the photometric reconstruction.
+'''
+-------------------------------------------------------------
+Photometric Model for Photometric Reconstruction
 Author: Mitterrand Ekole
 Date: 19-02-2024
+-------------------------------------------------------------
 '''
+
 
 import numpy as np
 

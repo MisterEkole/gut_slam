@@ -69,7 +69,7 @@ def main():
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
     #print(control_point.shape)
-    control_points=np.loadtxt('optimized_control_points.txt')
+    control_points=np.loadtxt('./log/optimized_control_points.txt')
   
     control_points=control_points.reshape(10,10,3)
     
@@ -128,7 +128,7 @@ def main():
     #visualize_point_cloud(cylinder_points)
     #point_cloud_to_mesh(cylinder_points)
     visualize_mesh_from_points(cylinder_points)
-    visualize_and_save_mesh_from_points(cylinder_points,'./mesh2.vtk',screenshot='./mesh.png')
+    visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh2.vtk',screenshot='./rendering/mesh1.png')
     #visualize_mesh_on_image(cylinder_points,'projection.png')
 
     #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)
