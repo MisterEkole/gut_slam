@@ -140,6 +140,10 @@ class WarpField:
             pts.append([x, y, z])  
 
         self.cylinder.points = np.array(pts)  
+    def get_mesh_pts(self):
+        return self.cylinder.points.copy()
+    def extract_mesh_pts(self):
+        return self.get_mesh_pts()
 
   
 
@@ -633,12 +637,13 @@ def visualize_mesh_from_points(points):
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
     mesh=mesh.smooth(n_iter=500)
+  
     scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
   
     plotter = pv.Plotter()
     #plotter.add_mesh(mesh,show_edges=True,style='surface',multi_colors=True)
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
-    #plotter.add_points(points, color='red')  # Optionally add the original points on top
+    #plotter.add_points(points, scalars=scalars,cmap='viridis')  # Optionally add the original points on top
     plotter.show()
     
 
@@ -673,7 +678,7 @@ def visualize_mesh_on_image(points, filename):
     """
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
-    mesh = mesh.smooth(n_iter=600)
+    mesh = mesh.smooth(n_iter=300)
     scalars = mesh.points[:, 2]
     
     plotter = pv.Plotter()

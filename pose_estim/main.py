@@ -7,8 +7,8 @@ from PIL import Image
 
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
-    #image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+    #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     image = cv2.imread(image_path)
     
     if image is None:
@@ -69,9 +69,9 @@ def main():
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
     #print(control_point.shape)
-    control_points=np.loadtxt('control_points5.txt')
+    control_points=np.loadtxt('optimized_control_points.txt')
   
-    control_points=control_points.reshape(5,5,3)
+    control_points=control_points.reshape(10,10,3)
     
 
     warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_points)
@@ -128,7 +128,7 @@ def main():
     #visualize_point_cloud(cylinder_points)
     #point_cloud_to_mesh(cylinder_points)
     visualize_mesh_from_points(cylinder_points)
-    #visualize_and_save_mesh_from_points(cylinder_points,'./mesh.vtk',screenshot='./mesh.png')
+    visualize_and_save_mesh_from_points(cylinder_points,'./mesh2.vtk',screenshot='./mesh.png')
     #visualize_mesh_on_image(cylinder_points,'projection.png')
 
     #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)

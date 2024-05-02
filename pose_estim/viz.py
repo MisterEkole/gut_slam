@@ -1,14 +1,95 @@
+'''
+Visualize 3D Mesh Wireframe on 2D Image
+Visualize 3D Mesh
+Author: Mitterand Ekole
+Date: 02-05-2024
+'''
+
 import cv2
 import numpy as np
 import pyvista as pv
 from utils import *
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+import matplotlib.cm as cmx
 from PIL import Image
 
+def plot_on_image(image_path, points_2d):
+    
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert from BGR to RGB
+
+    
+    plt.figure(figsize=(7, 5))
+    plt.imshow(image)
+    plt.scatter(points_2d[:, 0], points_2d[:, 1], color='red', s=10, alpha=0.6)  # scatter plot on the image
+    plt.axis('off')  
+    plt.show()
+
+def scale_projected_points(projected_pts, image_width, image_height):
+    # Normalize points to the range [0, 1]
+    min_x, max_x = np.min(projected_pts[:, 0]), np.max(projected_pts[:, 0])
+    min_y, max_y = np.min(projected_pts[:, 1]), np.max(projected_pts[:, 1])
+
+    # Scale points based on image dimensions
+    projected_pts[:, 0] = (projected_pts[:, 0] - min_x) / (max_x - min_x) * image_width
+    projected_pts[:, 1] = (projected_pts[:, 1] - min_y) / (max_y - min_y) * image_height
+
+    return projected_pts
+
+def read_vtk_file(vtk_file):
+    mesh = pv.read(vtk_file)
+    points = mesh.points
+    if mesh.faces.size > 0:
+        faces = mesh.faces.reshape(-1, 4)[:, 1:]  # Reshape and skip the first column if using VTK POLYDATA with 'vtkCellArray' format
+    else:
+        faces = np.array([])  # Handle the case where no faces data is present
+    return points, faces
+
+
+def plot_mesh_wireframe_on_image_cmap(image, points_2d, points_3d, faces):
+    plt.figure(figsize=(7, 5))
+    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    ax = plt.gca()  
+
+    scalars = points_3d[:, 2]  
+    norm = colors.Normalize(vmin=np.min(scalars), vmax=np.max(scalars))
+    cmap = plt.get_cmap('viridis')
+    sm = cmx.ScalarMappable(norm=norm, cmap=cmap)
+    #iterate through each face and draw lines between vertices
+    for face in faces:
+        for i in range(len(face)):
+            start_point = points_2d[face[i]]
+            end_point = points_2d[face[(i + 1) % len(face)]]
+            z_val = (points_3d[face[i], 2] + points_3d[face[(i + 1) % len(face)], 2]) / 2
+            color = sm.to_rgba(z_val)
+            ax.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color=color)
+
+ 
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, orientation='vertical', label='Z-Value')
+    ax.axis('off')  
+    ax.set_title("3D Mesh Wireframe on 2D Image with Colormap")
+    plt.show()
+
+
+def plot_mesh_wireframe_on_image(image, points_2d, faces):
+    plt.figure(figsize=(7, 5))
+    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    
+    # Iterate through each face and draw lines between vertices
+    for face in faces:
+        for i in range(len(face)):
+            start_point = points_2d[face[i]]
+            end_point = points_2d[face[(i + 1) % len(face)]]  # Connect vertices cyclically
+            plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color='red')
+    
+    plt.axis('off')  
+    plt.title("3D Mesh Wireframe on 2D Image")
+    plt.show()
 
 
 def main():
-    #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image1.jpeg'
     image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     image = cv2.imread(image_path)
     yaw=np.radians(0)
@@ -26,7 +107,7 @@ def main():
     center = image_center
     resolution = 500
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
-    #warp_field.save_pts('./cylinder_points.txt')
+ 
 
     a_values = np.zeros((image_height, image_width, 3)) 
     b_values = np.zeros((image_height, image_width))  
@@ -59,11 +140,6 @@ def main():
     rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
     trans_mat=np.array([0, 0, 10])
 
-
-
-    
-
-
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(
     image_height, image_width, rot_mat, trans_mat)
 
@@ -76,64 +152,23 @@ def main():
     #print(control_point.shape)
     control_points=np.loadtxt('optimized_control_points.txt')
   
-    control_points=control_points.reshape(5,5,3)
+    control_points=control_points.reshape(10,10,3)
     warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_points)
-   
+    mesh_pts, mesh_edges=read_vtk_file('/Users/ekole/Dev/gut_slam/pose_estim/mesh2.vtk')
+
     cylinder_points = warp_field.extract_pts()
-    print(cylinder_points)
-
-    projected_pts=projector.project_points(points_3d=cylinder_points)
-
-    #print(projected_pts)
+   
     
-    # k=2.5
-    # g_t=2.0
-    # gamma=2.2
 
-    # #precompute values for cylinder points and image points before doing the photometric projection
-
-
-    # # for point in cylinder_points:
-    # #     for row in range(image.shape[0]):
-    # #         for col in range(image.shape[1]):
-    # #             u = image[row, col]
-    # #             x,y,z=point
-    # #             L=calib_p_model(x,y,z,k,g_t,gamma)
-    # #             I=get_pixel_intensity(u)
-    # #             C=cost_func(I,L)
-    # #             #print("Pixel intensity: ",I, "Cost function: ",C, "Light intensity: ",L)
-      
-       
- 
-
-
+    projected_pts=projector.project_points(points_3d=mesh_pts)
+    projected_pts=scale_projected_points(projected_pts, image_width, image_height)
   
-
-    # plt.imshow(image)
-    # plt.xlim(0, image.shape[1])
-    # plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
-    # plt.scatter(projected_pts[:, 0], projected_pts[:, 1], color='red', s=10)  # Increased size for visibility
-    # plt.show()
-
-
-    # plt.imshow(image)
-    # plt.scatter([image.shape[1] / 2], [image.shape[0] / 2], color='red', s=10)  # Center of the image
-    # plt.show()
-
-    #plot 3D cylinder
-
-    # plotter = pv.Plotter()
-    # plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
-    # plotter.add_title("Deformable Cylinder Visualization")
-    # plotter.show()
-
-    #visualize_point_cloud(cylinder_points)
-    #point_cloud_to_mesh(cylinder_points)
+    #plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
+    plot_on_image(image_path, projected_pts)
+    plot_mesh_wireframe_on_image_cmap(image, projected_pts, mesh_pts, mesh_edges)
     visualize_mesh_from_points(cylinder_points)
 
-    #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)
-   
-
+    
 
   
 

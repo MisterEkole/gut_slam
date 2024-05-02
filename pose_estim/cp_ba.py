@@ -71,7 +71,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    control_points=params[12:-2].reshape(5,5,3)
+    control_points=params[12:-2].reshape(10,10,3)
     lambda_ortho = params[-2]
     lambda_det = params[-1]
     a=0.43613728652325934 
@@ -195,7 +195,8 @@ def log_optim_params(optimized_params, frame_idx):
 
 
 def main():
-    image_path = '/Users/ekole/Synth_Col_Data/Frames_S1/FrameBuffer_0125.png'  
+    
+    image_path='/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     print("Optimization started...")
     start_time = time.time()
 
@@ -231,8 +232,8 @@ def main():
     M,N=a_values.shape[:2]
     a_init=np.mean(a_values.ravel())
     b_init=np.mean(b_values.ravel())
-    control_points=np.loadtxt('control_points5.txt')
-    control_points=control_points.reshape(5,5,3)
+    control_points=np.loadtxt('control_points6.txt')
+    control_points=control_points.reshape(10,10,3)
   
 
     print(a_init,b_init)
