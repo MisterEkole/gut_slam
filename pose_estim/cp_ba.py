@@ -1,4 +1,4 @@
-''' Bundle Adjustment Algorithm for  Single Frame Pose and Deformation Estimation in GutSLAM
+''' Bundle Adjustment Algorithm for  Single Frame Pose and Control Point Estimation in GutSLAM
 Author: Mitterand Ekole
 Date: 25-03-2024
 '''
@@ -67,15 +67,19 @@ optimization_errors=[]
 
 
 
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det, control_points):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det):
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    a_params=params[12]
-    b_params=params[13]
+    control_points=params[12:-2].reshape(10,10,3)
+    lambda_ortho = params[-2]
+    lambda_det = params[-1]
+    a=0.43613728652325934 
+    b=0.0018595670614189284
+   
 
     
-    warp_field.b_mesh_deformation(a=a_params, b=b_params, control_points=control_points)
+    warp_field.b_mesh_deformation(a=a, b=b, control_points=control_points)
     points_3d_deformed = warp_field.extract_pts()
     
     # Project points
@@ -127,20 +131,26 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     return objective
 
 
-def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,  control_points):
+def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,a,b):
     global optimization_errors
     optimization_errors = []
-    lower_bounds = [-np.inf]*14 + [0, 0]  # Assuming non-negative values for the Lagrange multipliers
-    upper_bounds = [np.inf]*14 + [np.inf, np.inf]
+    # lower_bounds = [-np.inf]*14 + [0, 0]  # Assuming non-negative values for the Lagrange multipliers
+    # upper_bounds = [np.inf]*14 + [np.inf, np.inf]
+    num_params = len(initial_params)
+    lower_bounds = [-np.inf] * num_params
+    upper_bounds = [np.inf] * num_params
+    lower_bounds[-2:] = [0, 0]  # Setting non-negative bounds for lambda parameters
+    upper_bounds[-2:] = [np.inf, np.inf]
+
 
     # Perform optimization
     result = least_squares(
         objective_function,
         initial_params,
-        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1, control_points),#1,1 lambda ortho, lambda det init
+        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1),#1,1 lambda ortho, lambda det init
         method='dogbox',
-        bounds=(lower_bounds, upper_bounds),
-        max_nfev=1000,
+        #bounds=(lower_bounds, upper_bounds),
+        max_nfev=50,
         gtol=1e-8,
         tr_solver='lsmr'
     )
@@ -179,20 +189,14 @@ def log_optim_params(optimized_params, frame_idx):
         f.write(str(optimized_params[:9].reshape(3, 3)) + "\n")
         f.write("Translation Vector: \n")
         f.write(str(optimized_params[9:12]) + "\n")
-        f.write("Optimized a_val: ")
-        f.write(str(optimized_params[12]) + "\n")
-        f.write("Optimized b_val: ")
-        f.write(str(optimized_params[13]) + "\n\n")
-        f.write("Lambda Ortho: ")
-        f.write(str(optimized_params[14]) + "\n")
-        f.write("Lambda Det: ")
-        f.write(str(optimized_params[15]) + "\n\n")
+    np.savetxt('optimized_control_points.txt', optimized_params[12:-2].reshape(-1, 3))
        
 
 
 
 def main():
-    image_path = '/Users/ekole/Synth_Col_Data/Frames_S1/FrameBuffer_0125.png'  
+    
+    image_path='/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
     print("Optimization started...")
     start_time = time.time()
 
@@ -228,8 +232,8 @@ def main():
     M,N=a_values.shape[:2]
     a_init=np.mean(a_values.ravel())
     b_init=np.mean(b_values.ravel())
-    control_points=np.loadtxt('control_points.txt')
-    control_points=control_points.reshape(30,30,3)
+    control_points=np.loadtxt('control_points6.txt')
+    control_points=control_points.reshape(10,10,3)
   
 
     print(a_init,b_init)
@@ -260,22 +264,14 @@ def main():
     gamma = 2.2
     init_lambda_ortho = 1
     init_lambda_det = 1
-   
-    #control_points=np.random.rand(10,10,3)
-
-    initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), a_init, b_init,init_lambda_ortho,init_lambda_det])
-    #print(len(initial_params))
  
-    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,frame_idx=0,control_points=control_points)
+
+    initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(),control_points.ravel(),init_lambda_ortho, init_lambda_det])
+    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,frame_idx=0,a=a_init,b=b_init)
 
 
     log_optim_params(optimized_params, 0)
-    #warp_field.save_pts('./def_cylinder_points.txt')
-
-    #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)
-
-
-    #print(points_2d_observed.shape)
+  
 
     end_time = time.time()
     total_time = end_time - start_time
