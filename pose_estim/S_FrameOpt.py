@@ -1,6 +1,11 @@
-''' Bundle Adjustment Algorithm for  Single Frame Pose and Control Point Estimation in GutSLAM
+'''
+-------------------------------------------------------------
+Bundle Adjustment Algorithm for Single Frame Pose and Control 
+Point Estimation in GutSLAM
+
 Author: Mitterand Ekole
 Date: 25-03-2024
+-------------------------------------------------------------
 '''
 import cv2
 import numpy as np
@@ -182,15 +187,21 @@ def detect_feature_points(image):
     return kp
 
 def log_optim_params(optimized_params, frame_idx):
-    with open('./optimized_params_all_frames.txt', 'a') as f:
+    folder_path = './logs'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    file_path = os.path.join(folder_path, 'optimized_params_all_frames.txt')
+    
+    with open(file_path, 'a') as f:
         f.write(f"Frame {frame_idx}\n")
         f.write("Optimized Parameters:\n")
         f.write("Rotation Matrix: \n")
         f.write(str(optimized_params[:9].reshape(3, 3)) + "\n")
         f.write("Translation Vector: \n")
         f.write(str(optimized_params[9:12]) + "\n")
-    np.savetxt('optimized_control_points.txt', optimized_params[12:-2].reshape(-1, 3))
-       
+    control_points_file = os.path.join(folder_path, f'optimized_control_points_frame_{frame_idx}.txt')
+    np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
+
 
 
 
@@ -232,7 +243,7 @@ def main():
     M,N=a_values.shape[:2]
     a_init=np.mean(a_values.ravel())
     b_init=np.mean(b_values.ravel())
-    control_points=np.loadtxt('control_points6.txt')
+    control_points=np.loadtxt('./data/control_points6.txt')
     control_points=control_points.reshape(10,10,3)
   
 

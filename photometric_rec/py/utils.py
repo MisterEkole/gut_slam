@@ -1,3 +1,11 @@
+'''
+-------------------------------------------------------------
+Utils for Photometric  3D Reconstruction from Single Image
+Author: Mitterrand Ekole
+Date: 10-02-2024
+-------------------------------------------------------------
+'''
+
 import numpy as np
 from PIL import Image
 

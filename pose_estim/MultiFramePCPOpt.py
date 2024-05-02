@@ -1,8 +1,13 @@
-''' Multiframe bundle adjustment for pose and deformation estimation
+'''
+-------------------------------------------------------------
+Multiframe Pose Optimization and Mesh Control Point Adjustment
+via Bundle Adjustment in GutSLAM
+
 Author: Mitterand Ekole
 Date: 04-04-2024
-
+-------------------------------------------------------------
 '''
+
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
@@ -157,8 +162,13 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
 
 
 def log_errors(errors, frame_idx):
+    folder_path = './logs'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    file_path = os.path.join(folder_path, 'optimization_errors_all_frames.txt')
    
-    with open('./optimization_errors_all_frames.txt', 'a') as f:
+    with open(file_path, 'a') as f:
         f.write(f"Frame {frame_idx}\n")  # Indicate the start of a new frame
         for idx, error in enumerate(errors):
             f.write(f"Iteration {idx + 1}: Reprojection Error: {error['reprojection_error']:.4f}, Photometric Error: {error['photometric_error']:.4f}\n")
@@ -179,146 +189,96 @@ def detect_feature_points(image):
     return kp
 
 def log_optim_params(optimized_params, frame_idx):
-    with open('./optimized_params_all_frames.txt', 'a') as f:
+    folder_path = './logs'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    file_path = os.path.join(folder_path, 'optimized_params_all_frames.txt')
+    
+    with open(file_path, 'a') as f:
         f.write(f"Frame {frame_idx}\n")
         f.write("Optimized Parameters:\n")
         f.write("Rotation Matrix: \n")
         f.write(str(optimized_params[:9].reshape(3, 3)) + "\n")
         f.write("Translation Vector: \n")
         f.write(str(optimized_params[9:12]) + "\n")
-    np.savetxt('optimized_control_points.txt', optimized_params[12:-2].reshape(-1, 3))
-       
+    control_points_file = os.path.join(folder_path, f'optimized_control_points_frame_{frame_idx}.txt')
+    np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 
+
+
+''' multiple frame optimisation with use of previous optim params'''
 def main():
     frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S2'
     print("Optimization started...")
-    start_time=time.time()
-    #frames_directory = '/Users/ekole/Dev/gut_slam/gut_images'
+    start_time = time.time()
+
     frames = load_frames_from_directory(frames_directory)
     total_optim_time = 0
+
+    # Constants for optimization
+    k = 2.5
+    g_t = 2.0
+    gamma = 2.2
+
+    control_points = np.loadtxt('.data/control_points6.txt').reshape(10, 10, 3)
+
    
-    
-    # Assuming the first frame's parameters are applicable as the starting point for the next frames
+    init_lambda_ortho, init_lambda_det = 1, 1
+
+    optimized_params = None
+
+
     for frame_idx, image in enumerate(frames):
+        print("Processing Frame:", frame_idx)
+
+        if image is None:
+            print("Warning: Failed to read frame at index", frame_idx)
+            continue
+
         image_height, image_width = image.shape[:2]
-        image_center = (image_width / 2, image_height / 2, 0)
-        radius = 500  
-        height = 1000
-        vanishing_pts = (0, 0, 10)
-        center = image_center
-        resolution = 100
-        a_values = np.zeros((image_height, image_width, 3)) 
-        b_values = np.zeros((image_height, image_width))  
-        for row in range(image_height):
-            for col in range(image_width):
-                pixel = image[row, col]
-                p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
-                a_values[row, col] = p_minus_vp
-                b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
 
-        a_values = a_values / np.linalg.norm(np.mean(a_values, axis=1), axis=1, keepdims=True)
-        b_values = b_values / np.linalg.norm(b_values)
-       
-    
+     
+        points_2d_observed = detect_feature_points(image)
 
-        points_2d_observed=detect_feature_points(image)
-       
-        # Initialize or update warp field for each frame
-        warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
-        cylinder_points = warp_field.extract_pts()
-        control_points=np.loadtxt('control_points.txt')
-        control_points=control_points.reshape(30,30,3) 
         
-        if frame_idx == 0:
-            a_init=np.mean(a_values.ravel())
-            b_init=np.mean(b_values.ravel())
-           
-            warp_field.b_mesh_deformation(a=a_init, b=b_init, control_points=control_points)
-        else:
-           
-            warp_field.b_mesh_deformation(a=optimized_a, b=optimized_b, control_points=control_points)
+        warp_field = WarpField(radius=500, height=1000, vanishing_pts=(0, 0, 10), center=(image_width / 2, image_height / 2, 0), resolution=100)
+        warp_field.b_mesh_deformation(a=0.43613728652325934, b=0.0018595670614189284, control_points=control_points)
+        cylinder_points = warp_field.extract_pts()
 
-        if frame_idx == 0:
-            z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
-            z_unit_vector = z_vector / np.linalg.norm(z_vector) 
+        #init cam pose
+        z_vector = np.array([0, 0, 10])
+        z_unit_vector = z_vector / np.linalg.norm(z_vector)
+        x_camera_vector = np.array([1, 0, 0])
+        y_vector = np.cross(z_unit_vector, x_camera_vector)
+        x_vector = np.cross(z_unit_vector, y_vector)
+        x_vector /= np.linalg.norm(x_vector)
+        y_vector /= np.linalg.norm(y_vector)
+        rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+        trans_mat = np.array([0, 0, 10])
 
-            # Define X vector of the camera
-            x_camera_vector = np.array([1, 0, 0])
-
-            # Calculate Y vector
-            y_vector = np.cross(z_unit_vector, x_camera_vector)
-
-            # Recalculate X vector based on new Y
-            x_vector = np.cross(z_unit_vector, y_vector)
-
-            # Normalize X and Y vectors to ensure they are unit vectors
-            x_vector /= np.linalg.norm(x_vector)
-            y_vector /= np.linalg.norm(y_vector)
-
-            # Construct rotation matrix
-            rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-            trans_mat=np.array([0, 0, 10])
-        else:
-            # Use the optimized parameters from the previous frame for initialization
-            rot_mat = optimized_params[:9].reshape(3, 3)
-            trans_mat = optimized_params[9:12]
-
+    
         intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat)
-        k = 2.5
-        g_t = 2.0
-        gamma = 2.2
 
-        if frame_idx == 0:
-            a_init=np.mean(a_values.ravel())
-            b_init=np.mean(b_values.ravel())
-           
-            
-            initial_lamda_ortho = 0
-            initial_lamda_det = 0
-        else:
-            a_init = optimized_a
-            b_init =optimized_b
-            initial_lamda_ortho = optimized_lamda_ortho
-            initial_lamda_det = optimized_lamda_det
+       
+        initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), control_points.ravel(), init_lambda_ortho, init_lambda_det])
 
-        initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), a_init, b_init,initial_lamda_ortho, initial_lamda_det])
+       
         optim_start_time = time.time()
-        optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,control_points=control_points)
-
+        optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx, a=0.43613728652325934, b=0.0018595670614189284)
         optim_end_time = time.time()
 
-        optim_time=optim_end_time-optim_start_time
+        optim_time = optim_end_time - optim_start_time
         total_optim_time += optim_time
 
-        optimized_a = optimized_params[12]
-        optimized_b = optimized_params[13]
-        optimized_lamda_ortho = optimized_params[14]
-        optimized_lamda_det = optimized_params[15]
-
+       
         log_optim_params(optimized_params, frame_idx)
-        print("Optimizing Frame: ", frame_idx)
-     
+        print("Optimized Frame:", frame_idx)
 
-        # plt.imshow(image)
-        # plt.xlim(0, image.shape[1])
-        # plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
-        # plt.scatter(points_2d_observed[:, 0], points_2d_observed[:, 1], color='red', s=10)  # Increased size for visibility
-        # plt.title(f"Frame {frame_idx}")
-        # plt.show()
-
-        # Optional: Visualize  the optimized results for each frame
-        # print(f"Optimization time for frame {frame_idx}: {optim_time:.2f} seconds")
-
-    end_time=time.time()
-    total_time=end_time-start_time
+    end_time = time.time()
+    total_time = end_time - start_time
     print(f"Total execution time: {total_time:.2f} seconds")
-    #visualize_point_cloud(cylinder_points)
 
 if __name__ == "__main__":
     main()
-
-
-
-
 

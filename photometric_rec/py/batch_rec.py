@@ -1,3 +1,11 @@
+'''
+-------------------------------------------------------------
+Batch Photometric  3D Reconstruction from Single Image
+Author: Mitterrand Ekole
+Date: 28-02-2024
+-------------------------------------------------------------
+'''
+
 import argparse
 from calib import get_calibration
 from utils import get_intensity, unprojec_cam_model, get_intrinsic_matrix, get_canonical_intensity

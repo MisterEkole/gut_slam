@@ -1,7 +1,11 @@
-''' Utils for pose  and deformation estimation 
+'''
+-------------------------------------------------------------
+Utilities for Pose and Deformation Estimation
 Author: Mitterand Ekole
 Date: 16-03-2024
+-------------------------------------------------------------
 '''
+
 
 import numpy as np
 import open3d as o3d
