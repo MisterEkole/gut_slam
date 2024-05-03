@@ -3,7 +3,7 @@
 Utility script to parse and plot error data from a text file.
 
 Author: Mitterand Ekole
-Date: 043-05-2024
+Date: 03-05-2024
 -------------------------------------------------------------
 '''
 import matplotlib.pyplot as plt
