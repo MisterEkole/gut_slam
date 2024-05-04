@@ -152,11 +152,11 @@ def main():
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
     #print(control_point.shape)
-    control_points=np.loadtxt('./data/control_points6.txt')
+    control_points=np.loadtxt('./logs/optimized_control_points_frame_0.txt')
   
     control_points=control_points.reshape(10,10,3)
     warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_points)
-    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh2.vtk')
+    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh3.vtk')
 
     cylinder_points = warp_field.extract_pts()
    

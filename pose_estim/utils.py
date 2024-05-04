@@ -16,6 +16,7 @@ from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline,S
 import scipy.special
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import cv2
 class WarpField:
     """
     Initialize the WarpField class with cylinder parameters.
@@ -125,11 +126,14 @@ class WarpField:
                
                
                 for j in range(N):
-                    B_j[j] = (a / np.max(b)) * (1 - a / np.max(b)) ** (N - j)
+                    B_j[j] = (a / np.max(a+b)) * (1 - a / np.max(a+b)) ** (N - j)
+                    #print(np.max(a+b))
+                
                     
 
-                B_i /= np.linalg.norm(B_i, ord=2)  
-                B_j /= np.linalg.norm(B_j, ord=2)  
+                B_i /= np.linalg.norm(B_i, ord=2) 
+                B_j /= np.linalg.norm(B_j, ord=2) 
+               
 
        
             for i in range(M):
@@ -640,13 +644,14 @@ def visualize_mesh_from_points(points):
     # Create a PyVista point cloud object
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
+    #mesh=cloud.reconstruct_surface()
     mesh=mesh.smooth(n_iter=500)
   
     scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
   
     plotter = pv.Plotter()
     #plotter.add_mesh(mesh,show_edges=True,style='surface',multi_colors=True)
-    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False)
     #plotter.add_points(points, scalars=scalars,cmap='viridis')  # Optionally add the original points on top
     plotter.show()
     
@@ -686,7 +691,7 @@ def visualize_mesh_on_image(points, filename):
     scalars = mesh.points[:, 2]
     
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False)
     
     
     plotter.camera.position = (0, 0, 10)
@@ -738,3 +743,33 @@ def plot_3d_mesh_on_image(points_file, image_file):
         print("Error accessing mesh data. Check the integrity of the mesh structure.")
 
     plt.show()
+
+
+
+def compute_a_b_values(image_path):
+   
+    image = cv2.imread(image_path)
+    if image is None:
+        print("Error: Image not found.")
+        return None, None
+    image_height, image_width = image.shape[:2]
+    image_center = (image_width / 2, image_height / 2, 0)
+    
+    vanishing_pts = (0, 0, 10)
+   
+    a_values = np.zeros((image_height, image_width, 3), dtype=np.float32)
+    b_values = np.zeros((image_height, image_width), dtype=np.float32)
+
+    for row in range(image_height):
+        for col in range(image_width):
+            p_minus_vp = np.array([col, row, 0]) - np.array(vanishing_pts) 
+            a_values[row, col] = p_minus_vp
+            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
+
+   
+    a_values = a_values / np.linalg.norm(a_values, axis=(0, 1))
+    a_values=np.mean(a_values.ravel())
+    b_values = b_values / np.linalg.norm(b_values)
+    b_values=np.mean(b_values.ravel())
+
+    return a_values, b_values

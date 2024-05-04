@@ -14,6 +14,7 @@ from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, c
 import matplotlib.pyplot as plt
 import os
 import time
+from tqdm import tqdm
 
 
 # Function to load frames from a video file
@@ -66,15 +67,15 @@ optimization_errors=[]
 
 
 ''' Objective function with ortho and det constrains on Rot Mat using Lagrange Multipliers'''
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det,pbar):
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
     control_points=params[12:-2].reshape(10,10,3)
     lambda_ortho = params[-2]
     lambda_det = params[-1]
-    a=0.43613728652325934 
-    b=0.0018595670614189284
+    a=0.00051301747 
+    b=0.0018595674
    
 
     
@@ -126,6 +127,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
     objective += lambda_det * det_constraint**2
+    pbar.update(1)
 
     return objective
 
@@ -140,20 +142,20 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
     upper_bounds = [np.inf] * num_params
     lower_bounds[-2:] = [0, 0]  # Setting non-negative bounds for lambda parameters
     upper_bounds[-2:] = [np.inf, np.inf]
-
-
-    # Perform optimization
-    result = least_squares(
-        objective_function,
-        initial_params,
-        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1),#1,1 lambda ortho, lambda det init
-        method='dogbox',
-        #bounds=(lower_bounds, upper_bounds),
-        max_nfev=50,
-        gtol=1e-8,
-        tr_solver='lsmr'
-    )
     
+    with tqdm(total=frame_idx, desc=f"Optimizing frame {frame_idx}") as pbar:
+        result = least_squares(
+            objective_function,
+            initial_params,
+            args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1,pbar),#1,1 lambda ortho, lambda det init
+            method='dogbox',
+            #bounds=(lower_bounds, upper_bounds),
+            max_nfev=50,
+            gtol=1e-8,
+            tr_solver='lsmr'
+        )
+
+
     log_errors(optimization_errors, frame_idx)
     return result.x
 
@@ -198,10 +200,6 @@ def log_optim_params(optimized_params, frame_idx):
         f.write(str(optimized_params[9:12]) + "\n")
     control_points_file = os.path.join(folder_path, f'optimized_control_points_frame_{frame_idx}.txt')
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
-
-
-
-
 
 def main():
     frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S2'
@@ -268,7 +266,7 @@ def main():
 
   
         log_optim_params(optimized_params, frame_idx)
-        print("Optimized Frame:", frame_idx)
+       
 
     end_time = time.time()
     total_time = end_time - start_time
