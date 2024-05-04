@@ -33,7 +33,7 @@ def main():
     for row in range(image_height):
         for col in range(image_width):
             pixel = image[row, col]
-            p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
+            p_minus_vp = np.array([col, row, 0]) - np.array(vanishing_pts)
             a_values[row, col] = p_minus_vp
             b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
 
@@ -69,7 +69,8 @@ def main():
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
     #print(control_point.shape)
-    control_points=np.loadtxt('./log/optimized_control_points.txt')
+    control_points=np.loadtxt('./data/control_points10.txt')
+    #control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/control_points.txt')
   
     control_points=control_points.reshape(10,10,3)
     
@@ -78,57 +79,12 @@ def main():
     
     
     cylinder_points = warp_field.extract_pts()
-    print(cylinder_points)
+    #print(cylinder_points)
 
     projected_pts=projector.project_points(points_3d=cylinder_points)
 
-    #print(projected_pts)
-    
-    # k=2.5
-    # g_t=2.0
-    # gamma=2.2
-
-    # #precompute values for cylinder points and image points before doing the photometric projection
-
-
-    # # for point in cylinder_points:
-    # #     for row in range(image.shape[0]):
-    # #         for col in range(image.shape[1]):
-    # #             u = image[row, col]
-    # #             x,y,z=point
-    # #             L=calib_p_model(x,y,z,k,g_t,gamma)
-    # #             I=get_pixel_intensity(u)
-    # #             C=cost_func(I,L)
-    # #             #print("Pixel intensity: ",I, "Cost function: ",C, "Light intensity: ",L)
-      
-       
- 
-
-
-  
-
-    # plt.imshow(image)
-    # plt.xlim(0, image.shape[1])
-    # plt.ylim(image.shape[0], 0)  # Inverted y-axis to match image coordinate system
-    # plt.scatter(projected_pts[:, 0], projected_pts[:, 1], color='red', s=10)  # Increased size for visibility
-    # plt.show()
-
-
-    # plt.imshow(image)
-    # plt.scatter([image.shape[1] / 2], [image.shape[0] / 2], color='red', s=10)  # Center of the image
-    # plt.show()
-
-    #plot 3D cylinder
-
-    # plotter = pv.Plotter()
-    # plotter.add_mesh(warp_field.cylinder, show_edges=True, color='lightblue', edge_color='blue')
-    # plotter.add_title("Deformable Cylinder Visualization")
-    # plotter.show()
-
-    #visualize_point_cloud(cylinder_points)
-    #point_cloud_to_mesh(cylinder_points)
     visualize_mesh_from_points(cylinder_points)
-    visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh2.vtk',screenshot='./rendering/mesh1.png')
+    visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh3.ply',screenshot='./rendering/mesh3.png')
     #visualize_mesh_on_image(cylinder_points,'projection.png')
 
     #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)

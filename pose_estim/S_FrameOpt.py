@@ -20,7 +20,7 @@ from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, c
 import matplotlib.pyplot as plt
 import os
 import time
-
+from tqdm import tqdm
 
 # Function to load frames from a video file
 def load_frames_from_video(video_path):
@@ -72,15 +72,15 @@ optimization_errors=[]
 
 
 
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det,pbar):
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    control_points=params[12:-2].reshape(10,10,3)
+    control_points=params[12:-2].reshape(10,10,3) #always  manually change control points dimension based on input shape
     lambda_ortho = params[-2]
     lambda_det = params[-1]
-    a=0.43613728652325934 
-    b=0.0018595670614189284
+    a=0.00051301747 
+    b=0.0018595674
    
 
     
@@ -133,10 +133,12 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
     objective += lambda_det * det_constraint**2
 
+    pbar.update(1)
+
     return objective
 
 
-def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,a,b):
+def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
     global optimization_errors
     optimization_errors = []
     # lower_bounds = [-np.inf]*14 + [0, 0]  # Assuming non-negative values for the Lagrange multipliers
@@ -149,24 +151,31 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
 
 
     # Perform optimization
-    result = least_squares(
-        objective_function,
-        initial_params,
-        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1),#1,1 lambda ortho, lambda det init
-        method='dogbox',
-        #bounds=(lower_bounds, upper_bounds),
-        max_nfev=50,
-        gtol=1e-8,
-        tr_solver='lsmr'
-    )
+    with tqdm(total=frame_idx, desc=f"Optimizing frame {frame_idx}") as pbar:
+        result = least_squares(
+            objective_function,
+            initial_params,
+            args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1,pbar),#1,1 lambda ortho, lambda det init
+            method='dogbox',
+            #bounds=(lower_bounds, upper_bounds),
+            max_nfev=50,
+            gtol=1e-8,
+            tr_solver='lsmr'
+        )
+  
+    
     
     log_errors(optimization_errors, frame_idx)
     return result.x
 
-
 def log_errors(errors, frame_idx):
+    folder_path = './logs'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    
+    file_path = os.path.join(folder_path, 'optimization_errors_all_frames.txt')
    
-    with open('./optimization_errors_all_frames.txt', 'a') as f:
+    with open(file_path, 'a') as f:
         f.write(f"Frame {frame_idx}\n")  # Indicate the start of a new frame
         for idx, error in enumerate(errors):
             f.write(f"Iteration {idx + 1}: Reprojection Error: {error['reprojection_error']:.4f}, Photometric Error: {error['photometric_error']:.4f}\n")
@@ -223,39 +232,17 @@ def main():
     vanishing_pts = (0, 0, 10)
     center = image_center
     resolution = 100
-    a_values = np.zeros((image_height, image_width, 3)) 
-    b_values = np.zeros((image_height, image_width))  
-    
-
-    
-    for row in range(image_height):
-        for col in range(image_width):
-            pixel = image[row, col]
-            p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
-            a_values[row, col] = p_minus_vp
-            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
-
-           
-    a_values = a_values / np.linalg.norm(np.mean(a_values, axis=1), axis=1, keepdims=True)
-    b_values = b_values / np.linalg.norm(b_values)
-
-
-    M,N=a_values.shape[:2]
-    a_init=np.mean(a_values.ravel())
-    b_init=np.mean(b_values.ravel())
-    control_points=np.loadtxt('./data/control_points6.txt')
+   
+    control_points=np.loadtxt('./data/control_points10.txt')
     control_points=control_points.reshape(10,10,3)
   
-
-    print(a_init,b_init)
-
 
 
     points_2d_observed = detect_feature_points(image)
 
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
     #warp_field.save_pts('./cylinder_points.txt')
-    warp_field.b_mesh_deformation(a=a_init, b=b_init,control_points=control_points)
+    warp_field.b_mesh_deformation(a=0.00051301747, b=0.0018595674,control_points=control_points)
     cylinder_points = warp_field.extract_pts()
 
     z_vector = np.array([0, 0, 10])
@@ -278,7 +265,8 @@ def main():
  
 
     initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(),control_points.ravel(),init_lambda_ortho, init_lambda_det])
-    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,frame_idx=0,a=a_init,b=b_init)
+    optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,frame_idx=0)
+    
 
 
     log_optim_params(optimized_params, 0)

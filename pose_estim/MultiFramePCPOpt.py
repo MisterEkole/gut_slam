@@ -1,6 +1,6 @@
 '''
 -------------------------------------------------------------
-Multiframe Pose Optimization and Mesh Control Point Adjustment
+Multiframe Pose  and Mesh Control Point Optimization 
 via Bundle Adjustment in GutSLAM
 
 Author: Mitterand Ekole
@@ -15,6 +15,7 @@ from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, c
 import matplotlib.pyplot as plt
 import os
 import time
+from tqdm import tqdm
 
 
 # Function to load frames from a video file
@@ -67,15 +68,15 @@ optimization_errors=[]
 
 
 ''' Objective function with ortho and det constrains on Rot Mat using Lagrange Multipliers'''
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det,pbar):
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
     control_points=params[12:-2].reshape(10,10,3)
     lambda_ortho = params[-2]
     lambda_det = params[-1]
-    a=0.43613728652325934 
-    b=0.0018595670614189284
+    a=0.00051301747 
+    b=0.0018595674
    
 
     
@@ -128,6 +129,8 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
     objective += lambda_det * det_constraint**2
 
+    pbar.update(1)
+
     return objective
 
 
@@ -142,23 +145,22 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
     lower_bounds[-2:] = [0, 0]  # Setting non-negative bounds for lambda parameters
     upper_bounds[-2:] = [np.inf, np.inf]
 
+    with tqdm(total=frame_idx, desc=f"Optimizing frame {frame_idx}") as pbar:
+        result = least_squares(
+            objective_function,
+            initial_params,
+            args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1,pbar),#1,1 lambda ortho, lambda det init
+            method='dogbox',
+            #bounds=(lower_bounds, upper_bounds),
+            max_nfev=50,
+            gtol=1e-8,
+            tr_solver='lsmr'
+        )
 
-    # Perform optimization
-    result = least_squares(
-        objective_function,
-        initial_params,
-        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1),#1,1 lambda ortho, lambda det init
-        method='dogbox',
-        #bounds=(lower_bounds, upper_bounds),
-        max_nfev=50,
-        gtol=1e-8,
-        tr_solver='lsmr'
-    )
-    
+
+ 
     log_errors(optimization_errors, frame_idx)
     return result.x
-
-
 
 
 def log_errors(errors, frame_idx):
@@ -221,7 +223,7 @@ def main():
     g_t = 2.0
     gamma = 2.2
 
-    control_points = np.loadtxt('.data/control_points6.txt').reshape(10, 10, 3)
+    control_points = np.loadtxt('./data/control_points10.txt').reshape(10, 10, 3)
 
    
     init_lambda_ortho, init_lambda_det = 1, 1
@@ -243,7 +245,7 @@ def main():
 
         
         warp_field = WarpField(radius=500, height=1000, vanishing_pts=(0, 0, 10), center=(image_width / 2, image_height / 2, 0), resolution=100)
-        warp_field.b_mesh_deformation(a=0.43613728652325934, b=0.0018595670614189284, control_points=control_points)
+        warp_field.b_mesh_deformation(a=0.00051301747 , b=0.0018595674, control_points=control_points)
         cylinder_points = warp_field.extract_pts()
 
         #init cam pose
