@@ -251,7 +251,7 @@ def main():
         trans_mat = np.array([0, 0, 10])
 
     
-        intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat)
+        intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center=(image_width / 2, image_height / 2, 0))
 
        
         initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), control_points.ravel(), init_lambda_ortho, init_lambda_det])

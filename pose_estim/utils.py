@@ -278,7 +278,7 @@ class Project3D_2D_cam:
 
         return points_2d
     @staticmethod
-    def get_camera_parameters(image_height, image_width, rotation_vector, translation_vector):
+    def get_camera_parameters(image_height, image_width, rotation_vector, translation_vector,image_center):
         """
         Generates camera intrinsic matrix and sets rotation and translation vectors for extrinsic parameters.
         """
@@ -286,9 +286,10 @@ class Project3D_2D_cam:
         #fx = image_width / (2 * np.tan(90 / 2 * np.pi / 180))
         fx=2.22*(image_width/36)
         fy = fx
-        cx = image_width / 2
-        cy = image_height / 2
-
+        # cx = image_width / 2
+        # cy = image_height / 2
+        cx,cy,_=image_center
+      
         intrinsic_matrix = np.array([[fx, 0, cx],
                                      [0, fy, cy],
                                      [0, 0, 1]])
@@ -654,7 +655,42 @@ def visualize_mesh_from_points(points):
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False)
     #plotter.add_points(points, scalars=scalars,cmap='viridis')  # Optionally add the original points on top
     plotter.show()
+def visualize_mesh_in_polar_coordinates(points):
+    """
+    Visualizes a mesh from a given set of points in polar coordinates using PyVista.
     
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    """
+    # Convert Cartesian (x, y, z) to Polar (r, theta, z) coordinates
+    r = np.sqrt(points[:, 0]**2 + points[:, 1]**2)
+    theta = np.arctan2(points[:, 1], points[:, 0])
+    z = points[:, 2]
+
+    theta=np.append(theta,theta[0])
+    r=np.append(r,r[0])
+    z=np.append(z,z[0])
+    
+    # Creating a new array for polar coordinates (r, theta, z)
+    polar_points = np.column_stack((r, theta, z))
+    
+    # Create a PyVista point cloud object
+    cloud = pv.PolyData(polar_points)
+    mesh = cloud.delaunay_2d()
+    #mesh = mesh.smooth(n_iter=700)
+  
+    # Use Z-coordinates for coloring
+    scalars = mesh.points[:, 2]
+    axes_actor=pv.AxesActor()
+    axes_actor.x_axis_label="r"
+    axes_actor.y_axis_label="theta"
+    axes_actor.z_axis_label="z"
+   
+  
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
+    plotter.add_orientation_widget(axes_actor)
+    plotter.show()
 
 def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     """
@@ -677,6 +713,41 @@ def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     plotter.show(screenshot=screenshot)
     mesh.save(filename)
 
+def visualize_h_surface(points):
+    """
+    Visualizes the points as an H-Surface using PyVista.
+    """
+    points[:, 2] *= 5  
+    cloud = pv.PolyData(points)
+    mesh = cloud.delaunay_2d()
+    mesh=mesh.smooth(n_iter=500)
+    scalars = mesh.points[:, 2]
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars)
+    plotter.show()
+
+def visualize_cylindrical_surface(points):
+    """
+    Visualizes the points in cylindrical coordinates as a 3D surface using PyVista.
+    """
+    r = np.sqrt(points[:, 0]**2 + points[:, 1]**2)*10
+    theta = np.arctan2(points[:, 1], points[:, 0])*10
+    z = points[:, 2]
+  
+    
+    # Convert theta to a usable coordinate system for plotting
+    x = r * np.cos(theta)
+    y = r * np.sin(theta)
+
+    new_points = np.column_stack((x, y, z))
+    cloud = pv.PolyData(new_points)
+    mesh = cloud.delaunay_2d()
+    mesh=mesh.smooth(n_iter=500)
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, show_edges=True)
+    plotter.show()
 def visualize_mesh_on_image(points, filename):
     """
     Creates a 3D mesh from points and captures a 2D projection as an image.

@@ -61,7 +61,7 @@ def main():
 
 
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(
-    image_height, image_width, rot_mat, trans_mat)
+    image_height, image_width, rot_mat, trans_mat,center)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
@@ -69,7 +69,7 @@ def main():
     #control_points=np.random.rand(5,5,3)
     #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
     #print(control_point.shape)
-    control_points=np.loadtxt('./data/control_points10.txt')
+    control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/data/control_points10.txt')
     #control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/control_points.txt')
   
     control_points=control_points.reshape(10,10,3)
@@ -84,7 +84,10 @@ def main():
     projected_pts=projector.project_points(points_3d=cylinder_points)
 
     visualize_mesh_from_points(cylinder_points)
-    visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh3.ply',screenshot='./rendering/mesh3.png')
+    visualize_h_surface(cylinder_points)
+    visualize_cylindrical_surface(cylinder_points)
+    #visualize_mesh_in_polar_coordinates(cylinder_points)
+    #visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh4.vtk',screenshot='./rendering/mesh4.png')
     #visualize_mesh_on_image(cylinder_points,'projection.png')
 
     #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)

@@ -256,7 +256,7 @@ def main():
    
     trans_mat = np.array([0, 0, 10])
 
-    intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat)
+    intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)
     k = 2.5
     g_t = 2.0
     gamma = 2.2
