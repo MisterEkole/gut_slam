@@ -1,26 +1,36 @@
 import numpy as np
-from utils import *
 
-# control_points=np.random.rand(15,15,3)
-# np.savetxt('control_points.txt', control_points.reshape(-1,3))
+# Define cylinder parameters
+radius = 500  # example radius
+height = 1000  # example height
+M = 20  # number of height divisions
+N = 20  # number of angular divisions
 
-img_path='/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
-a_b_val=compute_a_b_values(img_path)
-print(a_b_val)
+# Generate control points for minimal deformation (points on cylinder surface)
+control_points_minimal = np.zeros((M, N, 3))
+for i in range(M):
+    h = i * height / (M - 1)
+    for j in range(N):
+        angle = 2 * np.pi * j / N
+        x = radius * np.cos(angle)
+        y = radius * np.sin(angle)
+        control_points_minimal[i, j, :] = [x, y, h]
 
+# Generate control points for significant deformation (distorted points)
+control_points_significant = np.zeros((M, N, 3))
+for i in range(M):
+    h = i * height / (M - 1) + np.random.uniform(-0.1, 0.1) * height  # slight random offset in height
+    for j in range(N):
+        perturbation = np.random.uniform(0.8, 1.2)  # random scaling factor
+        angle = 2 * np.pi * j / N + np.random.uniform(-0.1, 0.1)  # slight random offset in angle
+        x = radius * perturbation * np.cos(angle)
+        y = radius * perturbation * np.sin(angle)
+        control_points_significant[i, j, :] = [x, y, h]
 
-# Assuming you have `height` and `radius` defined, and `M` and `N` are the grid dimensions for the control points
-M = 10  # Number of vertical divisions
-N = 20  # Number of circular divisions
-height=1000
-radius=500
-heights = np.linspace(0, height, M)
-angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
-heights_grid, angles_grid = np.meshgrid(heights, angles)
+# Flatten arrays and convert to space-separated strings
+flat_minimal = control_points_minimal.reshape(-1, 3)
+flat_significant = control_points_significant.reshape(-1, 3)
 
-# Compute the x, y, z coordinates of the control points
-cp_x = radius * np.cos(angles_grid)
-cp_y = radius * np.sin(angles_grid)
-cp_z = heights_grid
-
-control_points = np.stack((cp_x, cp_y, cp_z), axis=-1)
+# Save to text files
+np.savetxt('./data/ControlPoints_Minimal.txt', flat_minimal, fmt='%e', delimiter=' ')
+np.savetxt('./data/ControlPoints_Significant.txt', flat_significant, fmt='%e', delimiter=' ')

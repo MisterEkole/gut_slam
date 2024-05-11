@@ -8,7 +8,7 @@ from PIL import Image
 
 def main():
     #image_path = '/Users/ekole/Dev/gut_slam/gut_images/image4.jpg'
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+    image_path = '/Users/ekole/Dev/gut_slam/pose_estim/rendering/img_o.png'
     image = cv2.imread(image_path)
     
     if image is None:
@@ -23,7 +23,7 @@ def main():
     center = image_center
     resolution = 500
     warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
-    #warp_field.save_pts('./cylinder_points.txt')
+   
 
     a_values = np.zeros((image_height, image_width, 3)) 
     b_values = np.zeros((image_height, image_width))  
@@ -55,21 +55,15 @@ def main():
     rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
     trans_mat=np.array([0, 0, 10])
 
-
-
-    
-
-
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(
     image_height, image_width, rot_mat, trans_mat,center)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
     
-    #control_points=np.random.rand(5,5,3)
-    #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
-    #print(control_point.shape)
+    
     control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/data/control_points10.txt')
+    
     #control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/control_points.txt')
   
     control_points=control_points.reshape(10,10,3)
@@ -79,18 +73,21 @@ def main():
     
     
     cylinder_points = warp_field.extract_pts()
-    #print(cylinder_points)
+   
+
+    visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh5.ply',screenshot='./rendering/mesh5.png')
+    
+    #render_and_save(mesh_file='./rendering/mesh5.vtk',output_filename='./rendering/img_output.png')
+ 
 
     projected_pts=projector.project_points(points_3d=cylinder_points)
 
-    visualize_mesh_from_points(cylinder_points)
-    visualize_h_surface(cylinder_points)
-    visualize_cylindrical_surface(cylinder_points)
-    #visualize_mesh_in_polar_coordinates(cylinder_points)
-    #visualize_and_save_mesh_from_points(cylinder_points,'./rendering/mesh4.vtk',screenshot='./rendering/mesh4.png')
+    #visualize_3dmeshpol(cylinder_points)
+    #visualize_3dmeshcart(cylinder_points)
+    #visualize_h_surface(cylinder_points)
+
     #visualize_mesh_on_image(cylinder_points,'projection.png')
 
-    #plot_3d_mesh_on_image('./def_cylinder_points.txt',image_path)
    
 
 

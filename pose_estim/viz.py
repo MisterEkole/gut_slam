@@ -90,9 +90,30 @@ def plot_mesh_wireframe_on_image(image, points_2d, faces):
     plt.title("3D Mesh Wireframe on 2D Image")
     plt.show()
 
+def get_camera_parameters(image_height, image_width,rotation_vector, translation_vector, image_center):
+    """
+    Generate camera intrinsic matrix and set rotation and translation vectors for extrinsic parameters.
+    """
+   
+    #focal_length_px = image_width / (2 * np.tan(np.radians(30)))
+    focal_length_px=2.22*(image_width/36)
+
+    cx, cy, _ = image_center
+
+    intrinsic_matrix = np.array([
+        [focal_length_px, 0, cx],
+        [0, focal_length_px, cy],
+        [0, 0, 1]
+    ])
+
+    
+    rotation_matrix = np.array(rotation_vector).reshape(3,3)
+    translation_matrix = np.array(translation_vector).reshape(3,1)  
+    return intrinsic_matrix, rotation_matrix, translation_matrix
+
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+    image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/mesh1.png'
     image = cv2.imread(image_path)
     yaw=np.radians(0)
     pitch=np.radians(0)
@@ -102,34 +123,13 @@ def main():
         return
  
     image_height, image_width = image.shape[:2]
-    image_center = (image_width / 2, image_height / 2, 0)
+    image_center = (image_height/2, image_width/2, 0)
     radius = 500 # in mm  use approriate measuements along with appropriate camera parameters to match scaling and projection
     height = 1000
     vanishing_pts = (0, 0, 10)
     center = image_center
     resolution = 500
-    warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
- 
-
-    a_values = np.zeros((image_height, image_width, 3)) 
-    b_values = np.zeros((image_height, image_width))  
-    
-
-    
-    for row in range(image_height):
-        for col in range(image_width):
-            pixel = image[row, col]
-            p_minus_vp = np.array([row, col, 0]) - np.array(vanishing_pts)
-            a_values[row, col] = p_minus_vp
-            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
-
-           
-    
-    a_values=np.array(a_values)
-    a_values=np.max(a_values/(np.linalg.norm(np.mean(a_values,axis=1))))
-    b_values=np.array(b_values)
-    b_values=np.max(b_values/(np.linalg.norm(b_values)))
-
+    # warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
 
     #init rot and trans mat
     z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
@@ -140,35 +140,23 @@ def main():
     x_vector /= np.linalg.norm(x_vector)
     y_vector /= np.linalg.norm(y_vector)
     rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-    trans_mat=np.array([0, 0, 10])
+    trans_mat=np.array([0, 0, 1])
 
-    intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(
+    intrinsic_matrix, rotation_matrix, translation_vector =get_camera_parameters(
     image_height, image_width, rot_mat, trans_mat,center)
+    
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-
-    
-    #control_points=np.random.rand(5,5,3)
-    #np.savetxt('control_points5.txt', control_points.reshape(-1,3))
-    #print(control_point.shape)
-    control_points=np.loadtxt('./logs/s_optimized_control_points_frame_0.txt')
-  
-    control_points=control_points.reshape(10,10,3)
-    warp_field.b_mesh_deformation(a=a_values, b=b_values, control_points=control_points)
-    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh4.vtk')
-
-    cylinder_points = warp_field.extract_pts()
-   
-    
+    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh1.ply')
 
     projected_pts=projector.project_points(points_3d=mesh_pts)
     projected_pts=scale_projected_points(projected_pts, image_width, image_height)
   
-    #plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
+    plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
     plot_on_image(image_path, projected_pts)
-    plot_mesh_wireframe_on_image_cmap(image, projected_pts, mesh_pts, mesh_edges)
-    visualize_mesh_from_points(cylinder_points)
+    #plot_mesh_wireframe_on_image_cmap(image, projected_pts, mesh_pts, mesh_edges)
+    #visualize_mesh_from_points(cylinder_points)
 
     
 
