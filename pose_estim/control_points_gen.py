@@ -1,10 +1,10 @@
 import numpy as np
 
-# Define cylinder parameters
-radius = 500  # example radius
-height = 1000  # example height
-M = 20  # number of height divisions
-N = 20  # number of angular divisions
+
+radius = 500  
+height = 1000 
+M = 20  
+N = 20 
 
 # Generate control points for minimal deformation (points on cylinder surface)
 control_points_minimal = np.zeros((M, N, 3))
