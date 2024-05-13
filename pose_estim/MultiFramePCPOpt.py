@@ -11,7 +11,7 @@ Date: 04-04-2024
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
-from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, cost_func, get_pixel_intensity, reg_func, visualize_point_cloud
+from utils import *
 import matplotlib.pyplot as plt
 import os
 import time
@@ -260,7 +260,7 @@ def main():
         trans_mat = np.array([0, 0, 10])
 
     
-        intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat)
+        intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center=(image_width / 2, image_height / 2, 0))
 
        
         initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), control_points.ravel(), init_lambda_ortho, init_lambda_det])
