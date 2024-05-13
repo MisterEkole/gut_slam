@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
-from utils import WarpField, Project3D_2D_cam, Points_Processor,calib_p_model, cost_func, get_pixel_intensity, reg_func, visualize_point_cloud,plot_3d_mesh_on_image
+from utils import *
 import matplotlib.pyplot as plt
 import os
 import time
@@ -216,7 +216,7 @@ def log_optim_params(optimized_params, frame_idx):
 
 def main():
     
-    image_path='/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0038.png'
+    image_path='./rendering/mesh1.png'
     print("Optimization started...")
     start_time = time.time()
 

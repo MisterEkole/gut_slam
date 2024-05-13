@@ -379,140 +379,6 @@ def euler_to_rot_mat(yaw, pitch, roll):
    
     rot_mat = Rz_yaw @ Ry_pitch @ Rx_roll #xyz order
     return rot_mat
-##=============================================================================
-##=============================================================================
-## Objective Func--1 for bundle adjustment
-##=============================================================================
-##=============================================================================
-
-
-
-''' Objective function with ortho and det constrains on Rot Mat using Lagrange Multipliers'''
-# def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det,control_points):
-#     if not isinstance(points_2d_observed, np.ndarray):
-#         points_2d_observed = np.array(points_2d_observed)
-
-    
-#     rotation_matrix = params[:9].reshape(3, 3)
-#     translation_vector = params[9:12]
-#     a_params = params[12]
-#     b_params = params[13]
-    
-#     warp_field.b_mesh_deformation(a=a_params, b=b_params, control_points=control_points)
-#     points_3d_deformed = warp_field.extract_pts()
-    
-    
-#     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-#     projected_2d_pts = projector.project_points(points_3d_deformed)
-#     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
-#         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
-#     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
-#         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
-    
-#     points_2d_observed = points_2d_observed.reshape(-1, 2)
-    
-#     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
-#     photometric_error = []
-#     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
-#         if np.isnan(pt2d).any():
-#             pt2d=np.where(np.isnan(pt2d),1,pt2d) #replace nan with 1 in arrays
-#         x, y, z = pt3d
-#         L = calib_p_model(x, y, z, k, g_t, gamma)
-#         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
-#             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
-#             C = cost_func(pixel_intensity, L)
-#         else:
-#             C = 0
-#         photometric_error.append(float(C))
-#     photometric_error = np.array(photometric_error, dtype=float)
-    
- 
-
-#      #Normalize each error type to the same scale
-#     reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
-#     photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
-
-#     global optimization_errors
-#     optimization_errors.append(
-#         {
-#             'reprojection_error': np.mean(reprojection_error),
-#             'photometric_error': np.mean(photometric_error),
-#         }
-#     )
-
-#     # Constraints with Lagrange Multipliers
-#     ortho_constraint = np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3)
-#     det_constraint = np.linalg.det(rotation_matrix) - 1
-
-#     # Objective function with Lagrange multipliers
-#     objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
-#     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
-#     objective += lambda_det * det_constraint**2
-
-#     return objective
-
-''' objective func with ortho and det constraints for single frame with  constraints on Rot and Trans using langrange multipliers'''
-
-# def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det, control_points):
-#     # Unpacking parameters
-#     rotation_matrix = params[:9].reshape(3, 3)
-#     translation_vector = params[9:12]
-#     a_params=params[12]
-#     b_params=params[13]
-
-    
-#     warp_field.b_mesh_deformation(a=a_params, b=b_params, control_points=control_points)
-#     points_3d_deformed = warp_field.extract_pts()
-    
-#     # Project points
-#     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-#     projected_2d_pts = projector.project_points(points_3d_deformed)
-#     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
-#         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
-#     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
-#         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
-#     points_2d_observed = points_2d_observed.reshape(-1, 2)
-    
-#     # Compute reprojection and photometric errors
-#     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
-#     photometric_error = []
-#     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
-#         x, y, z = pt3d
-#         L = calib_p_model(x, y, z, k, g_t, gamma)
-#         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
-#             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
-#             C = cost_func(pixel_intensity, L)
-#         else:
-#             C = 0
-#         photometric_error.append(float(C))
-#     photometric_error = np.array(photometric_error, dtype=float)
-    
- 
-
-#      #Normalize each error type to the same scale
-#     reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
-#     photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
-
-#     global optimization_errors
-#     optimization_errors.append(
-#         {
-#             'reprojection_error': np.mean(reprojection_error),
-#             'photometric_error': np.mean(photometric_error),
-#         }
-#     )
-
-#     # Constraints with Lagrange Multipliers
-#     ortho_constraint = np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3)
-#     det_constraint = np.linalg.det(rotation_matrix) - 1
-
-#     # Objective function with Lagrange multipliers
-#     objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
-#     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
-#     objective += lambda_det * det_constraint**2
-
-#     return objective
-
-
 
 
 ##=============================================================================
@@ -521,50 +387,52 @@ def euler_to_rot_mat(yaw, pitch, roll):
 ##=============================================================================
 ##=============================================================================
 
-def visualize_point_cloud(points):
-    """
-    Visualizes a point cloud using Open3D.
-    
-    Parameters:
-    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
-    """
-    # Convert the NumPy array of points into an Open3D PointCloud object
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-    
-    # Optionally, estimate normals to improve the visualization. This can be useful
-    # for visualizing the point cloud with lighting effects.
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=30, max_nn=500))
-    
-    # Visualize the point cloud
-    o3d.visualization.draw_geometries([pcd], window_name="Point Cloud Visualization", point_show_normal=False)
+class GridViz:
+    def __init__(self, grid_shape):
+        # Initialize the plotter with a specified grid shape
+        self.plotter = pv.Plotter(shape=grid_shape)
 
+    def add_mesh_cartesian(self, points, subplot):
+        # Visualize a 3D mesh from points in Cartesian coordinates
+        scaler = StandardScaler()
+        points = scaler.fit_transform(points)
+        cloud = pv.PolyData(points)
 
-def point_cloud_to_mesh(points):
-    """
-    Reconstructs a mesh from a point cloud and visualizes it using Open3D.
-    
-    Parameters:
-    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
-    """
-   
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-    
+        mesh = cloud.delaunay_3d()
+        scalars = mesh.points[:, 2]  
+        self.plotter.subplot(*subplot)
+        self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        self.plotter.add_axes()
 
-    if not pcd.has_normals():
-        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=1000))
-    
-   
-    radii = [10, 100, 100, 100]  
-    bpa_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-                   pcd,
-                   o3d.utility.DoubleVector(radii))
-    
-    
-    dec_mesh = bpa_mesh.simplify_quadric_decimation(target_number_of_triangles=1000)
-   
-    o3d.visualization.draw_geometries([dec_mesh], window_name="Mesh Visualization")
+    def add_mesh_polar(self, points, subplot):
+        # Visualize a 3D mesh from points in Polar coordinates
+        scaler = StandardScaler()
+        points = scaler.fit_transform(points)
+        cloud = pv.PolyData(points)
+
+        mesh = cloud.delaunay_2d()
+        mesh = mesh.smooth(n_iter=600)
+        scalars = mesh.points[:, 2]
+        self.plotter.subplot(*subplot)
+        self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h')
+
+    def add_h_surface(self, points, subplot):
+        # Visualize an H-Surface from points
+        points[:, 2] *= 3
+        cloud = pv.PolyData(points)
+        mesh = cloud.delaunay_2d()
+        mesh = mesh.smooth(n_iter=600)
+        scalars = mesh.points[:, 2]
+        
+        self.plotter.subplot(*subplot)
+        self.plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars, show_scalar_bar=False)
+        self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h')
+
+    def __call__(self):
+        # Display the plot when the instance is called
+        self.plotter.show()
+
 
 
 def visualize_3dmeshcart(points):
@@ -583,6 +451,7 @@ def visualize_3dmeshcart(points):
     scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
     plotter = pv.Plotter()
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+    plotter.add_axes()
     #plotter.add_points(points, color='red', point_size=5)
     plotter.show()
 
@@ -598,12 +467,30 @@ def visualize_3dmeshpol(points):
     scaler=StandardScaler()
     points=scaler.fit_transform(points)
     cloud = pv.PolyData(points)
-    mesh=cloud.reconstruct_surface()
+    mesh=cloud.delaunay_2d()
+    mesh=mesh.smooth(n_iter=600)
     scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
     plotter = pv.Plotter()
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+    plotter.add_axes(interactive=True,xlabel='r', ylabel='theta', zlabel='h')
     #plotter.add_points(points, color='red', point_size=5)
     plotter.show()
+
+def visualize_h_surface(points):
+    """
+    Visualizes the points as an H-Surface(heighted surface) using PyVista.
+    """
+    points[:, 2] *= 3
+    cloud = pv.PolyData(points)
+    mesh = cloud.delaunay_2d()
+    mesh=mesh.smooth(n_iter=600)
+    scalars = mesh.points[:, 2]
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars,show_scalar_bar=False) 
+    plotter.add_axes(interactive=True,xlabel='rho', ylabel='alpha', zlabel='h')
+    plotter.show()
+
 
 
 
@@ -629,19 +516,47 @@ def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     plotter.show(screenshot=screenshot)
     mesh.save(filename)
 
-def visualize_h_surface(points):
+def visualize_and_save_mesh_with_camera(points, filename, screenshot=None):
     """
-    Visualizes the points as an H-Surface using PyVista.
+    Creates, visualizes, and saves a mesh from a given set of points using PyVista and captures the camera settings.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    - filename: String, the path and file name to save the mesh.
+    - screenshot: Optional string, the path and file name to save a screenshot of the plot.
+
+    Returns:
+    - camera_settings: Dictionary containing the camera's position, focal point, and view up vector.
     """
-    points[:, 2] *= 5  
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
-    mesh=mesh.smooth(n_iter=500)
+    mesh.smooth(n_iter=600)
     scalars = mesh.points[:, 2]
-
+    
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars)
-    plotter.show()
+
+    #plotter.add_mesh(mesh, color="white", show_edges=True)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+
+    # Set the camera position, focal point, and view up vector manually
+    camera_position = (10, 10, 10)  
+    focal_point = (0, 0, 0) 
+    view_up = (0, 0, 1)  
+    plotter.camera.position = camera_position
+    plotter.camera.focal_point = focal_point
+    plotter.camera.view_up = view_up
+    
+    plotter.show(screenshot=screenshot)
+    mesh.save(filename)
+
+    # Retrieve the camera settings to ensure consistent usage
+    camera_settings = {
+        "position": plotter.camera.position,
+        "focal_point": plotter.camera.focal_point,
+        "view_up": plotter.camera.view_up
+    }
+
+    return camera_settings
 
 
 
@@ -673,31 +588,3 @@ def compute_a_b_values(image_path):
     b_values=np.mean(b_values.ravel())
 
     return a_values, b_values
-
-def generate_control_points(radius, height, num_radial, num_height):
-    """
-    Generate control points for a cylindrical surface with minimal deformation.
-    
-    Parameters:
-        radius (float): Radius of the cylinder.
-        height (float): Height of the cylinder.
-        num_radial (int): Number of control points in the radial direction.
-        num_height (int): Number of control points along the height.
-        
-    Returns:
-        np.array: Array of control points shaped (num_height, num_radial, 3).
-    """
-    control_points = np.zeros((num_height, num_radial, 3))
-
-    for i in range(num_height):
-        z = height * (i / (num_height - 1))  # Linearly interpolate along the height
-        for j in range(num_radial):
-            theta = 2 * np.pi * (j / (num_radial - 1))  # Evenly spaced around the cylinder
-            x = radius * np.cos(theta)
-            y = radius * np.sin(theta)
-
-            # Apply a small random perturbation
-            perturbation = np.random.normal(loc=0.0, scale=0.0 * radius, size=3)
-            control_points[i, j, :] = [x, y, z] + perturbation
-
-    return control_points

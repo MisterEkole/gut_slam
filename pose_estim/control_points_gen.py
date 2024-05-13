@@ -21,8 +21,8 @@ control_points_significant = np.zeros((M, N, 3))
 for i in range(M):
     h = i * height / (M - 1) + np.random.uniform(-0.1, 0.1) * height  # slight random offset in height
     for j in range(N):
-        perturbation = np.random.uniform(0.8, 1.2)  # random scaling factor
-        angle = 2 * np.pi * j / N + np.random.uniform(-0.1, 0.1)  # slight random offset in angle
+        perturbation = np.random.uniform(0.8, 1.0)  # random scaling factor
+        angle = 2 * np.pi * j / N + np.random.uniform(-0.5, 0.5)  # slight random offset in angle
         x = radius * perturbation * np.cos(angle)
         y = radius * perturbation * np.sin(angle)
         control_points_significant[i, j, :] = [x, y, h]

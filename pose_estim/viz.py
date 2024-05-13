@@ -74,17 +74,53 @@ def plot_mesh_wireframe_on_image_cmap(image, points_2d, points_3d, faces):
     ax.set_title("3D Mesh Wireframe on 2D Image with Colormap")
     plt.show()
 
+def densify_points(points, num_divisions=5):
+    """
+    Create additional points along the edges to densify the projected points for better visualization.
+    
+    Parameters:
+    - points: array of projected points.
+    - num_divisions: number of segments to split each edge into.
 
-def plot_mesh_wireframe_on_image(image, points_2d, faces):
+    Returns:
+    - A new array with the original and interpolated points.
+    """
+    if points.shape[0] < 2:
+        return points
+
+    all_points = []
+    for i in range(len(points) - 1):
+        start_point = points[i]
+        end_point = points[i + 1]
+        divisions = [start_point + (end_point - start_point) * j / num_divisions for j in range(num_divisions + 1)]
+        all_points.extend(divisions)
+
+    # Ensure the last point is added
+    all_points.append(points[-1])
+    return np.array(all_points)
+
+
+def plot_mesh_wireframe_on_image(image, points_2d, faces, num_divisions=5):
+    """
+    Plot a densified wireframe mesh on a 2D image.
+
+    Parameters:
+    - image: An image array on which the mesh will be plotted.
+    - points_2d: 2D projected points of the mesh vertices.
+    - faces: Index array of the faces, where each face is represented as a list of indices into points_2d.
+    - num_divisions: Number of divisions to densify each edge of the mesh.
+    """
     plt.figure(figsize=(7, 5))
     plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     
-    # Iterate through each face and draw lines between vertices
+    # Iterate through each face and draw densified lines between vertices
     for face in faces:
         for i in range(len(face)):
-            start_point = points_2d[face[i]]
-            end_point = points_2d[face[(i + 1) % len(face)]]  # Connect vertices cyclically
-            plt.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]], color='red')
+            start_idx = face[i]
+            end_idx = face[(i + 1) % len(face)]  # Connect vertices cyclically
+            edge_points = np.array([points_2d[start_idx], points_2d[end_idx]])
+            #densified_edge_points = densify_points(edge_points, num_divisions=num_divisions)
+            plt.plot(edge_points[:, 0], edge_points[:, 1], color='red')
     
     plt.axis('off')  
     plt.title("3D Mesh Wireframe on 2D Image")
@@ -111,6 +147,23 @@ def get_camera_parameters(image_height, image_width,rotation_vector, translation
     translation_matrix = np.array(translation_vector).reshape(3,1)  
     return intrinsic_matrix, rotation_matrix, translation_matrix
 
+def calculate_rotation_matrix(position, focal_point, view_up):
+    """
+    Calculate the rotation matrix to align the camera direction with the focal point.
+
+    Parameters:
+    - position: Camera position.
+    - focal_point: The point where the camera is looking.
+    - view_up: The up direction for the camera.
+    """
+    forward = (focal_point - position) / np.linalg.norm(focal_point - position)
+    right = np.cross(forward, view_up)
+    right = right / np.linalg.norm(right)
+    corrected_up = np.cross(right, forward)
+    
+    rotation_matrix = np.stack([right, corrected_up, -forward], axis=1)
+    return rotation_matrix
+
 
 def main():
     image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/mesh1.png'
@@ -129,7 +182,9 @@ def main():
     vanishing_pts = (0, 0, 10)
     center = image_center
     resolution = 500
-    # warp_field = WarpField(radius, height, vanishing_pts, center, resolution)
+
+
+    cam_info={'position': (-2.510988602877194, 1.7868918455172287, -0.6673224048144908), 'focal_point': (0.880493941699113, 1.5300509582764665, 1.4076667974191355), 'view_up': (0, 0, 1)}
 
     #init rot and trans mat
     z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
@@ -140,7 +195,14 @@ def main():
     x_vector /= np.linalg.norm(x_vector)
     y_vector /= np.linalg.norm(y_vector)
     rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-    trans_mat=np.array([0, 0, 1])
+    trans_mat=np.array([10, 10, 10])
+
+    # Calculate Rotation and Translation from Camera Information
+    # cam_position = np.array(cam_info['position'])
+    # cam_focal_point = np.array(cam_info['focal_point'])
+    # cam_view_up = np.array(cam_info['view_up'])
+    # trans_mat=cam_position
+    # rot_mat=calculate_rotation_matrix(cam_position,cam_focal_point,cam_view_up)
 
     intrinsic_matrix, rotation_matrix, translation_vector =get_camera_parameters(
     image_height, image_width, rot_mat, trans_mat,center)
@@ -148,13 +210,14 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh1.ply')
+    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh1.vtk')
 
     projected_pts=projector.project_points(points_3d=mesh_pts)
     projected_pts=scale_projected_points(projected_pts, image_width, image_height)
   
     plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
     plot_on_image(image_path, projected_pts)
+    
     #plot_mesh_wireframe_on_image_cmap(image, projected_pts, mesh_pts, mesh_edges)
     #visualize_mesh_from_points(cylinder_points)
 
