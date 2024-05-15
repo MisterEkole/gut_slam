@@ -216,7 +216,7 @@ def log_optim_params(optimized_params, frame_idx):
 
 def main():
     
-    image_path='./rendering/mesh1.png'
+    image_path='./rendering/mesh7.png'
     print("Optimization started...")
     start_time = time.time()
 
@@ -233,7 +233,7 @@ def main():
     center = image_center
     resolution = 100
    
-    control_points=np.loadtxt('./data/control_points10.txt')
+    control_points=np.loadtxt('./data/ControlPoints_Significant10.txt')
     control_points=control_points.reshape(10,10,3)
   
 

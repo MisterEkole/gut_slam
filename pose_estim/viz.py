@@ -126,13 +126,14 @@ def plot_mesh_wireframe_on_image(image, points_2d, faces, num_divisions=5):
     plt.title("3D Mesh Wireframe on 2D Image")
     plt.show()
 
-def get_camera_parameters(image_height, image_width,rotation_vector, translation_vector, image_center):
+def get_camera_parameters(image_height, image_width,rotation_matrix, translation_vector, image_center):
     """
     Generate camera intrinsic matrix and set rotation and translation vectors for extrinsic parameters.
     """
    
-    #focal_length_px = image_width / (2 * np.tan(np.radians(30)))
-    focal_length_px=2.22*(image_width/36)
+    focal_length_px = image_height / (2 * np.tan(np.radians(60)/2))
+    #focal_length_px=2.22*(image_width/36)
+   
 
     cx, cy, _ = image_center
 
@@ -143,7 +144,7 @@ def get_camera_parameters(image_height, image_width,rotation_vector, translation
     ])
 
     
-    rotation_matrix = np.array(rotation_vector).reshape(3,3)
+    #rotation_matrix = np.array(rotation_vector).reshape(3,3)
     translation_matrix = np.array(translation_vector).reshape(3,1)  
     return intrinsic_matrix, rotation_matrix, translation_matrix
 
@@ -166,43 +167,41 @@ def calculate_rotation_matrix(position, focal_point, view_up):
 
 
 def main():
-    image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/mesh1.png'
+    image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/mesh9.png'
     image = cv2.imread(image_path)
-    yaw=np.radians(0)
-    pitch=np.radians(0)
-    roll=np.radians(0)
+
     if image is None:
         print("Error: Image not found.")
         return
  
     image_height, image_width = image.shape[:2]
     image_center = (image_height/2, image_width/2, 0)
-    radius = 500 # in mm  use approriate measuements along with appropriate camera parameters to match scaling and projection
-    height = 1000
-    vanishing_pts = (0, 0, 10)
     center = image_center
-    resolution = 500
-
-
-    cam_info={'position': (-2.510988602877194, 1.7868918455172287, -0.6673224048144908), 'focal_point': (0.880493941699113, 1.5300509582764665, 1.4076667974191355), 'view_up': (0, 0, 1)}
+    # cam_info={'position':(4.310669534819416, 5.074316599765719, 4.636957423146306),
+    #     'focal_point':(-0.14862758317728766, 0.6150194817690126, 0.17766030514960568),
+    #         'view_up': (0.0, 0.0, 1.0)}
+    cam_info={'position':(4.442435128936857, 4.892312186729204, 4.68719624206537),
+        'focal_point':(-0.016861989059850247, 0.43301506873249845, 0.2278991240686753),
+            'view_up': (0.0, 0.0, 1.0)}
 
     #init rot and trans mat
-    z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
-    z_unit_vector = z_vector / np.linalg.norm(z_vector) 
-    x_camera_vector = np.array([1, 0, 0])
-    y_vector = np.cross(z_unit_vector, x_camera_vector)
-    x_vector = np.cross(z_unit_vector, y_vector)
-    x_vector /= np.linalg.norm(x_vector)
-    y_vector /= np.linalg.norm(y_vector)
-    rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-    trans_mat=np.array([10, 10, 10])
+    # z_vector = np.array([0, 0, 10]) #vp from vanishing pooint
+    # z_unit_vector = z_vector / np.linalg.norm(z_vector) 
+    # x_camera_vector = np.array([1, 0, 0])
+    # y_vector = np.cross(z_unit_vector, x_camera_vector)
+    # x_vector = np.cross(z_unit_vector, y_vector)
+    # x_vector /= np.linalg.norm(x_vector)
+    # y_vector /= np.linalg.norm(y_vector)
+    # rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+    # trans_mat=np.array([10, 10, 10])
+    #trans_mat=np.array([4.310669534819416, 5.074316599765719, 4.636957423146306])
 
     # Calculate Rotation and Translation from Camera Information
-    # cam_position = np.array(cam_info['position'])
-    # cam_focal_point = np.array(cam_info['focal_point'])
-    # cam_view_up = np.array(cam_info['view_up'])
-    # trans_mat=cam_position
-    # rot_mat=calculate_rotation_matrix(cam_position,cam_focal_point,cam_view_up)
+    cam_position = np.array(cam_info['position'])
+    cam_focal_point = np.array(cam_info['focal_point'])
+    cam_view_up = np.array(cam_info['view_up'])
+    trans_mat=cam_position
+    rot_mat=calculate_rotation_matrix(cam_position,cam_focal_point,cam_view_up)
 
     intrinsic_matrix, rotation_matrix, translation_vector =get_camera_parameters(
     image_height, image_width, rot_mat, trans_mat,center)
@@ -210,16 +209,16 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh1.vtk')
+    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh9.ply')
 
     projected_pts=projector.project_points(points_3d=mesh_pts)
     projected_pts=scale_projected_points(projected_pts, image_width, image_height)
   
-    plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
-    plot_on_image(image_path, projected_pts)
-    
-    #plot_mesh_wireframe_on_image_cmap(image, projected_pts, mesh_pts, mesh_edges)
-    #visualize_mesh_from_points(cylinder_points)
+    # plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
+    # plot_on_image(image_path, projected_pts)
+    #load_and_plot_mesh('./rendering/textured_gut_mesh.ply')
+    load_and_plot_mesh('./rendering/mesh9.ply')
+
 
     
 
