@@ -12,11 +12,12 @@ import open3d as o3d
 import pyvista as pv
 import scipy
 from scipy.optimize import least_squares
-from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline,SmoothBivariateSpline,interp2d
+from scipy.interpolate import make_interp_spline, BSpline, RectBivariateSpline,SmoothBivariateSpline,interp2d,LSQBivariateSpline
 import scipy.special
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import cv2
+from sklearn.preprocessing import StandardScaler
 class WarpField:
     """
     Initialize the WarpField class with cylinder parameters.
@@ -107,6 +108,7 @@ class WarpField:
         cp_y = control_points[:, :, 1].ravel()
         cp_z = control_points[:, :, 2].ravel()
 
+      
     
         spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N/20)
         spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N/20)
@@ -153,98 +155,7 @@ class WarpField:
     def extract_mesh_pts(self):
         return self.get_mesh_pts()
 
-  
 
-
-
-
-    
-class Points_Processor:
-    def __init__(self, target_num_points=None, normalize=False):
-        """
-        Initialize the PointProcessor.
-
-        Parameters:
-        - target_num_points: The target number of points for downsampling. If None, downsampling is not performed.
-        - normalize: A boolean indicating whether the point clouds should be normalized.
-        """
-        self.target_num_points = target_num_points
-        self.normalize = normalize
-    
-    def read_point_from_txt(self, file_path):
-        """
-        Reads a point cloud from a text file, attempting to automatically detect the delimiter.
-
-        Parameters:
-        - file_path: The path to the .txt file containing the point cloud data.
-
-        Returns:
-        - A NumPy array containing the point cloud.
-        """
-        # Attempt to read with common delimiters and select the one that works
-        for delimiter in [',', ' ']:
-            try:
-                return np.loadtxt(file_path, delimiter=delimiter)
-            except ValueError:
-                continue
-        # If neither delimiter worked, raise an error
-        raise ValueError(f"Failed to automatically detect delimiter and read point cloud data from {file_path}.")
-
-
-    def downsample(self, pc):
-        """Downsample the point cloud to a specific number of points."""
-        if self.target_num_points is not None and pc.shape[0] > self.target_num_points:
-            indices = np.random.choice(pc.shape[0], self.target_num_points, replace=False)
-            return pc[indices]
-        return pc
-
-    def normalize_points(self, pc):
-        """Normalize the point cloud to have zero mean and fit within the range [-1, 1]."""
-        pc -= np.mean(pc, axis=0)  # Center to zero
-        max_abs_val = np.max(np.abs(pc))
-        pc /= max_abs_val  # Scale to [-1, 1]
-        return pc
-
-    def prepare(self, pc):
-        """
-        Apply downsampling and normalization to the point cloud based on the initialization parameters.
-        """
-        pc = self.downsample(pc)
-        if self.normalize:
-            pc = self.normalize_points(pc)
-        return pc
-    
-    
-    
-    def align_points(self, source_pc, target_pc, threshold=1.0):  #optional method
-        """
-        Align two 3D points  using the ICP algorithm.
-
-        Parameters:
-        - source_pc: The source point cloud as a NumPy array.
-        - target_pc: The target point cloud as a NumPy array to align to the source.
-        - threshold: The distance threshold to consider for point matches.
-
-        Returns:
-        - Aligned version of target_pc as a NumPy array.
-        """
-        # Convert numpy arrays to Open3D point clouds
-        source = o3d.geometry.PointCloud()
-        source.points = o3d.utility.Vector3dVector(source_pc)
-        target = o3d.geometry.PointCloud()
-        target.points = o3d.utility.Vector3dVector(target_pc)
-
-        # Perform ICP alignment
-        trans_init = np.identity(4)  # Initial transformation
-        reg_p2p = o3d.pipelines.registration.registration_icp(
-            source, target, threshold, trans_init,
-            o3d.pipelines.registration.TransformationEstimationPointToPoint())
-        
-        # Apply the transformation to the target point cloud
-        target.transform(reg_p2p.transformation)
-
-        # Return the aligned point cloud as a numpy array
-        return np.asarray(target.points)
 
 
 
@@ -283,8 +194,8 @@ class Project3D_2D_cam:
         Generates camera intrinsic matrix and sets rotation and translation vectors for extrinsic parameters.
         """
         #fx = 200
-        #fx = image_width / (2 * np.tan(90 / 2 * np.pi / 180))
-        fx=2.22*(image_width/36)
+        fx = image_height / (2 * np.tan(np.radians(30)/2))
+        #fx=2.22*(image_width/36)
         fy = fx
         # cx = image_width / 2
         # cy = image_height / 2
@@ -377,210 +288,6 @@ def euler_to_rot_mat(yaw, pitch, roll):
    
     rot_mat = Rz_yaw @ Ry_pitch @ Rx_roll #xyz order
     return rot_mat
-##=============================================================================
-##=============================================================================
-## Objective Func--1 for bundle adjustment
-##=============================================================================
-##=============================================================================
-
-
-
-''' Objective function with ortho and det constrains on Rot Mat using Lagrange Multipliers'''
-# def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det,control_points):
-#     if not isinstance(points_2d_observed, np.ndarray):
-#         points_2d_observed = np.array(points_2d_observed)
-
-    
-#     rotation_matrix = params[:9].reshape(3, 3)
-#     translation_vector = params[9:12]
-#     a_params = params[12]
-#     b_params = params[13]
-    
-#     warp_field.b_mesh_deformation(a=a_params, b=b_params, control_points=control_points)
-#     points_3d_deformed = warp_field.extract_pts()
-    
-    
-#     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-#     projected_2d_pts = projector.project_points(points_3d_deformed)
-#     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
-#         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
-#     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
-#         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
-    
-#     points_2d_observed = points_2d_observed.reshape(-1, 2)
-    
-#     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
-#     photometric_error = []
-#     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
-#         if np.isnan(pt2d).any():
-#             pt2d=np.where(np.isnan(pt2d),1,pt2d) #replace nan with 1 in arrays
-#         x, y, z = pt3d
-#         L = calib_p_model(x, y, z, k, g_t, gamma)
-#         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
-#             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
-#             C = cost_func(pixel_intensity, L)
-#         else:
-#             C = 0
-#         photometric_error.append(float(C))
-#     photometric_error = np.array(photometric_error, dtype=float)
-    
- 
-
-#      #Normalize each error type to the same scale
-#     reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
-#     photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
-
-#     global optimization_errors
-#     optimization_errors.append(
-#         {
-#             'reprojection_error': np.mean(reprojection_error),
-#             'photometric_error': np.mean(photometric_error),
-#         }
-#     )
-
-#     # Constraints with Lagrange Multipliers
-#     ortho_constraint = np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3)
-#     det_constraint = np.linalg.det(rotation_matrix) - 1
-
-#     # Objective function with Lagrange multipliers
-#     objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
-#     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
-#     objective += lambda_det * det_constraint**2
-
-#     return objective
-
-''' objective func with ortho and det constraints for single frame with  constraints on Rot and Trans using langrange multipliers'''
-
-# def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det, control_points):
-#     # Unpacking parameters
-#     rotation_matrix = params[:9].reshape(3, 3)
-#     translation_vector = params[9:12]
-#     a_params=params[12]
-#     b_params=params[13]
-
-    
-#     warp_field.b_mesh_deformation(a=a_params, b=b_params, control_points=control_points)
-#     points_3d_deformed = warp_field.extract_pts()
-    
-#     # Project points
-#     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-#     projected_2d_pts = projector.project_points(points_3d_deformed)
-#     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
-#         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
-#     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
-#         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
-#     points_2d_observed = points_2d_observed.reshape(-1, 2)
-    
-#     # Compute reprojection and photometric errors
-#     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
-#     photometric_error = []
-#     for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
-#         x, y, z = pt3d
-#         L = calib_p_model(x, y, z, k, g_t, gamma)
-#         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
-#             pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
-#             C = cost_func(pixel_intensity, L)
-#         else:
-#             C = 0
-#         photometric_error.append(float(C))
-#     photometric_error = np.array(photometric_error, dtype=float)
-    
- 
-
-#      #Normalize each error type to the same scale
-#     reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
-#     photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
-
-#     global optimization_errors
-#     optimization_errors.append(
-#         {
-#             'reprojection_error': np.mean(reprojection_error),
-#             'photometric_error': np.mean(photometric_error),
-#         }
-#     )
-
-#     # Constraints with Lagrange Multipliers
-#     ortho_constraint = np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3)
-#     det_constraint = np.linalg.det(rotation_matrix) - 1
-
-#     # Objective function with Lagrange multipliers
-#     objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
-#     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2  # Frobenius norm for matrix norm
-#     objective += lambda_det * det_constraint**2
-
-#     return objective
-
-
-''' Optim params func for single frame ba with penalty scale factor approach'''
-# def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
-#     global optimization_errors
-#     optimization_errors=[]
-#     # result = least_squares(objective_function, 
-#     #                        initial_params,
-#     #                      args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-#     #                      method='lm', max_nfev=2000, gtol=1e-6)
-#     result = least_squares(objective_function, 
-#                        initial_params,
-#                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-#                        method='trf',  # Trust Region Reflective algorithm s
-#                        bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [0, 0],  # Lower bounds for def params, rot and translation no bounds
-#                                [np.inf]*9 + [np.inf, np.inf, np.inf] + [np.inf, np.inf]),  # Upper bounds for def params, rot and translation no bounds
-#                        #max_nfev=5000, 
-#                        gtol=1e-8,
-#                        tr_solver='lsmr'
-#                        #verbose=2
-#                        )
-    
-#     log_errors(optimization_errors, frame_idx)
-
-#     return result.x
-
-# def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,  control_points):
-#     global optimization_errors
-#     optimization_errors = []
-#     lower_bounds = [-np.inf]*14 + [0, 0]  # Assuming non-negative values for the Lagrange multipliers
-#     upper_bounds = [np.inf]*14 + [np.inf, np.inf]
-
-#     # Perform optimization
-#     result = least_squares(
-#         objective_function,
-#         initial_params,
-#         args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1, control_points),#1,1 lambda ortho, lambda det init
-#         method='trf',
-#         bounds=(lower_bounds, upper_bounds),
-#         max_nfev=1000,
-#         gtol=1e-8,
-#         tr_solver='lsmr'
-#     )
-    
-#     log_errors(optimization_errors, frame_idx)
-#     return result.x
-
-
-''' optim params func with multi frame ba using  penalty_scale approach'''
-# def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx):
-#     global optimization_errors
-#     optimization_errors=[]
-#     # result = least_squares(objective_function, 
-#     #                        initial_params,
-#     #                      args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-#     #                      method='lm', max_nfev=2000, gtol=1e-6)
-#     result = least_squares(objective_function, 
-#                        initial_params,
-#                        args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field), 
-#                        method='trf',  # Trust Region Reflective algorithm s
-#                        bounds=([-np.inf]*9 + [-np.inf, -np.inf, -np.inf] + [-np.inf, -np.inf],  # Lower bounds for def params, rot and translation no bounds
-#                                [np.inf]*9 + [np.inf, np.inf, np.inf] + [np.inf, np.inf]),  # Upper bounds for def params, rot and translation no bounds
-#                        max_nfev=1000, 
-#                        gtol=1e-6,
-#                        tr_solver='lsmr'
-#                        #verbose=2
-#                        )
-    
-#     log_errors(optimization_errors, frame_idx)
-
-#     return result.x
-
 
 
 ##=============================================================================
@@ -589,118 +296,241 @@ def euler_to_rot_mat(yaw, pitch, roll):
 ##=============================================================================
 ##=============================================================================
 
-def visualize_point_cloud(points):
-    """
-    Visualizes a point cloud using Open3D.
+class GridViz:
+    def __init__(self, grid_shape, window_size=(1200, 800)):
+        # Initialize the plotter with a specified grid shape
+        self.plotter = pv.Plotter(shape=grid_shape,window_size=window_size)
+
+    def add_mesh_cartesian(self, points, subplot):
+        # Visualize a 3D mesh from points in Cartesian coordinates
+        scaler = StandardScaler()
+        points = scaler.fit_transform(points)
+        cloud = pv.PolyData(points)
+
+        mesh = cloud.delaunay_3d()
+        scalars = mesh.points[:, 2]  
+        self.plotter.subplot(*subplot)
+        #self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        self.plotter.add_points(mesh.points, color='green', point_size=5)
+        self.plotter.add_axes()
+
+    def add_mesh_polar(self, points, subplot):
+        x = points[:, 0]
+        y = points[:, 1]
+        z = points[:, 2]
     
-    Parameters:
-    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
-    """
-    # Convert the NumPy array of points into an Open3D PointCloud object
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
+        rho = np.sqrt(x**2 + y**2)
+        alpha = np.arctan2(y, x)
+        h = z
     
-    # Optionally, estimate normals to improve the visualization. This can be useful
-    # for visualizing the point cloud with lighting effects.
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=30, max_nn=500))
+        points = np.vstack((rho, alpha, h)).T
+        #polar_points=np.column_stack((rho,alpha))
+        # Visualize a 3D mesh from points in Polar coordinates
+        scaler = StandardScaler()
+        points = scaler.fit_transform(points)
+        #points = np.column_stack((polar_points, np.zeros(polar_points.shape[0])))
+        cloud = pv.PolyData(points)
+
+        mesh = cloud.delaunay_2d()
+        mesh = mesh.smooth(n_iter=600)
+        scalars = mesh.points[:, 2]
+        self.plotter.subplot(*subplot)
+        self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, color='red', show_edges=False, render_points_as_spheres=True)
+        #self.plotter.add_points(mesh.points, color='green', point_size=5)
+        self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h')
+
+    def add_h_surface(self, points, subplot):
+        # Visualize an H-Surface from points
+        x = points[:, 0]
+        y = points[:, 1]
+        z = points[:, 2]/points[:, 2]
     
-    # Visualize the point cloud
-    o3d.visualization.draw_geometries([pcd], window_name="Point Cloud Visualization", point_show_normal=False)
+        rho = np.sqrt(x**2 + y**2)
+        alpha = np.arctan2(y, x)
+        h = z
+    
+        points = np.vstack((rho, alpha, h)).T
+        #points[:, 2] *= 1
+        cloud = pv.PolyData(points)
+        mesh = cloud.delaunay_2d()
+        mesh = mesh.smooth(n_iter=600)
+        scalars = mesh.points[:, 2]
+        
+        self.plotter.subplot(*subplot)
+        self.plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        #self.plotter.add_points(mesh.points, color='blue', point_size=5)
+        self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h')
+
+    def add_3dmesh_open(self, points, subplot):
+        """
+        Creates and visualizes a 3D open-ended cylinder in Cartesian coordinates from a given set of points using PyVista.
+        
+        Parameters:
+        - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+        - subplot: A tuple specifying the subplot location (row, col).
+        """
+        # Standardize the points
+        scaler = StandardScaler()
+        points = scaler.fit_transform(points)
+        cloud = pv.PolyData(points)
+        surface=cloud.delaunay_2d()
+        #surface = surface.smooth(n_iter=600)
+        direction = (0, 0, 5)
+        extrude_mesh = surface.extrude(vector=direction, capping=False)
+        new_scalars = np.interp(np.linspace(0, 1, num=extrude_mesh.n_points), 
+                                np.linspace(0, 1, num=len(points[:, 2])), 
+                                points[:, 2])
+        
+        c_pts=extrude_mesh.points
 
 
-def point_cloud_to_mesh(points):
-    """
-    Reconstructs a mesh from a point cloud and visualizes it using Open3D.
-    
-    Parameters:
-    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
-    """
-   
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-    
+        self.plotter.subplot(*subplot)
+        #self.plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        #self.plotter.add_mesh(extrude_mesh, color='white', show_edges=False)
+        self.plotter.add_points(c_pts, color='red', point_size=5)
+        self.plotter.add_axes()
 
-    if not pcd.has_normals():
-        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=5, max_nn=1000))
-    
-   
-    radii = [10, 100, 100, 100]  
-    bpa_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-                   pcd,
-                   o3d.utility.DoubleVector(radii))
-    
-    
-    dec_mesh = bpa_mesh.simplify_quadric_decimation(target_number_of_triangles=1000)
-   
-    o3d.visualization.draw_geometries([dec_mesh], window_name="Mesh Visualization")
+    def __call__(self):
+        # Display the plot when the instance is called
+        self.plotter.show()
 
-
-def visualize_mesh_from_points(points):
+def visualize_3dmeshcart(points):
     """
-    Creates and visualizes a mesh from a given set of points using PyVista.
+    Creates and visualizes a  3D mesh in cartesian coord from a given set of points using PyVista.
     
     Parameters:
     - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
     """
     # Create a PyVista point cloud object
+    scaler=StandardScaler()
+    points=scaler.fit_transform(points)
+    cloud = pv.PolyData(points)
+    
+    mesh = cloud.delaunay_3d()
+    scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+    plotter.add_axes()
+    #plotter.add_points(points, color='red', point_size=5)
+    plotter.show()
+
+def visualize_3dmeshopen(points):
+    """
+    Creates and visualizes a 3D open-ended cylinder in Cartesian coordinates from a given set of points using PyVista.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    """
+    # Standardize the points
+    scaler = StandardScaler()
+    points = scaler.fit_transform(points)
+    cloud=pv.PolyData(points)
+    surface=cloud.delaunay_2d()
+    surface=surface.smooth(n_iter=600)
+    direction=(0,0,20)
+    heights=points[:,2].ptp()
+    extrude_mesh=surface.extrude(vector=direction, capping=False)
+    new_scalars = np.interp(np.linspace(0, 1, num=extrude_mesh.n_points), 
+                        np.linspace(0, 1, num=len(points[:, 2])), 
+                        points[:, 2])
+
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis',show_edges=True, show_scalar_bar=False)
+    plotter.add_axes()
+    plotter.show()
+
+def visualize_3dmeshpol(points):
+    """
+    Creates and visualizes a  3D mesh in Polar coord from a given set of points using PyVista.
+    
+    Parameters:
+    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
+    """
+    # Create a PyVista point cloud object
+    scaler=StandardScaler()
+    points=scaler.fit_transform(points)
+    cloud = pv.PolyData(points)
+    mesh=cloud.delaunay_2d()
+    mesh=mesh.smooth(n_iter=600)
+    scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+    plotter.add_axes(interactive=True,xlabel='r', ylabel='theta', zlabel='h')
+    #plotter.add_points(points, color='red', point_size=5)
+    plotter.show()
+
+def visualize_h_surface(points):
+    """
+    Visualizes the points as an H-Surface(heighted surface) using PyVista.
+    """
+    x = points[:, 0]
+    y = points[:, 1]
+    z = points[:, 2]/points[:, 2]
+    
+    rho = np.sqrt(x**2 + y**2)
+    alpha = np.arctan2(y, x)
+    h = z
+    
+    points = np.vstack((rho, alpha, h)).T
+    #points[:, 2] *= 3
+    scaler=StandardScaler()
+    points=scaler.fit_transform(points)
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
-    #mesh=cloud.reconstruct_surface()
-    mesh=mesh.smooth(n_iter=500)
-  
-    scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
-  
-    plotter = pv.Plotter()
-    #plotter.add_mesh(mesh,show_edges=True,style='surface',multi_colors=True)
-    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False)
-    #plotter.add_points(points, scalars=scalars,cmap='viridis')  # Optionally add the original points on top
-    plotter.show()
-def visualize_mesh_in_polar_coordinates(points):
-    """
-    Visualizes a mesh from a given set of points in polar coordinates using PyVista.
-    
-    Parameters:
-    - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
-    """
-    # Convert Cartesian (x, y, z) to Polar (r, theta, z) coordinates
-    r = np.sqrt(points[:, 0]**2 + points[:, 1]**2)
-    theta = np.arctan2(points[:, 1], points[:, 0])
-    z = points[:, 2]
-
-    theta=np.append(theta,theta[0])
-    r=np.append(r,r[0])
-    z=np.append(z,z[0])
-    
-    # Creating a new array for polar coordinates (r, theta, z)
-    polar_points = np.column_stack((r, theta, z))
-    
-    # Create a PyVista point cloud object
-    cloud = pv.PolyData(polar_points)
-    mesh = cloud.delaunay_2d()
-    #mesh = mesh.smooth(n_iter=700)
-  
-    # Use Z-coordinates for coloring
+    mesh=mesh.smooth(n_iter=600)
     scalars = mesh.points[:, 2]
-    axes_actor=pv.AxesActor()
-    axes_actor.x_axis_label="r"
-    axes_actor.y_axis_label="theta"
-    axes_actor.z_axis_label="z"
-   
-  
+
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
-    plotter.add_orientation_widget(axes_actor)
+    #plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars,show_scalar_bar=False)
+    plotter.add_points(mesh.points, color='blue', point_size=5) 
+    plotter.add_axes(interactive=True,xlabel='rho', ylabel='alpha', zlabel='h')
+    plotter.show()
+
+
+'''loads a mesh file and plot it'''
+def load_and_plot_mesh(file_path):
+    mesh = pv.read(file_path)
+    z_values = mesh.points[:, 2]
+    z_min, z_max = z_values.min(), z_values.max()
+    z_normalized = (z_values - z_min) / (z_max - z_min)
+
+    # Create custom colors mimicking human gut color
+    base_color = np.array([1.0, 0.5, 0.5])  # Pinkish-red
+    variation_strength = 0.1
+    colors = np.tile(base_color, (mesh.n_points, 1))
+    #colors += variation_strength * np.random.uniform(-1, 1, colors.shape)
+    
+
+    #introduce variation in color intensity based on normalized z val
+    intensity_variation = np.random.uniform(0.8, 1.2, mesh.n_points).reshape(-1, 1)
+    height_based_variation = (z_normalized * 0.5 + 0.5).reshape(-1, 1)
+    colors *= intensity_variation * height_based_variation
+
+    colors = np.clip(colors, 0, 1)
+
+    mesh.point_data['colors'] = colors
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, scalars='colors', rgb=True)
+    plotter.set_background("white")
     plotter.show()
 
 def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     """
     Creates, visualizes, and saves a mesh from a given set of points using PyVista.
+
     
     Parameters:
     - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
     - filename: String, the path and file name to save the mesh. The format is inferred from the extension.
     - screenshot: Optional string, the path and file name to save a screenshot of the plot.
     """
+    scaler=StandardScaler()
+    points=scaler.fit_transform(points)
    
     cloud = pv.PolyData(points)
 
@@ -708,112 +538,57 @@ def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     mesh = mesh.smooth(n_iter=600)
     scalars = mesh.points[:, 2]
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True)
-    plotter.add_scalar_bar(title="Scene Deformation", label_font_size=10, title_font_size=10)
+    #plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False, show_scalar_bar=False)
+    plotter.add_mesh(mesh, color="white", show_edges=False)
+    #plotter.add_scalar_bar(title="Scene Deformation", label_font_size=10, title_font_size=10)
     plotter.show(screenshot=screenshot)
+
+    cam_pos=plotter.camera_position
+    print('Camera position:', cam_pos)
     mesh.save(filename)
 
-def visualize_h_surface(points):
+def visualize_and_save_mesh_with_camera(points, filename, screenshot=None):
     """
-    Visualizes the points as an H-Surface using PyVista.
-    """
-    points[:, 2] *= 5  
-    cloud = pv.PolyData(points)
-    mesh = cloud.delaunay_2d()
-    mesh=mesh.smooth(n_iter=500)
-    scalars = mesh.points[:, 2]
-
-    plotter = pv.Plotter()
-    plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars)
-    plotter.show()
-
-def visualize_cylindrical_surface(points):
-    """
-    Visualizes the points in cylindrical coordinates as a 3D surface using PyVista.
-    """
-    r = np.sqrt(points[:, 0]**2 + points[:, 1]**2)*10
-    theta = np.arctan2(points[:, 1], points[:, 0])*10
-    z = points[:, 2]
-  
-    
-    # Convert theta to a usable coordinate system for plotting
-    x = r * np.cos(theta)
-    y = r * np.sin(theta)
-
-    new_points = np.column_stack((x, y, z))
-    cloud = pv.PolyData(new_points)
-    mesh = cloud.delaunay_2d()
-    mesh=mesh.smooth(n_iter=500)
-
-    plotter = pv.Plotter()
-    plotter.add_mesh(mesh, show_edges=True)
-    plotter.show()
-def visualize_mesh_on_image(points, filename):
-    """
-    Creates a 3D mesh from points and captures a 2D projection as an image.
+    Creates, visualizes, and saves a mesh from a given set of points using PyVista and captures the camera settings.
     
     Parameters:
     - points: A NumPy array of shape (N, 3) containing the XYZ coordinates of the points.
-    - filename: String, the file name to save the screenshot.
+    - filename: String, the path and file name to save the mesh.
+    - screenshot: Optional string, the path and file name to save a screenshot of the plot.
+
+    Returns:
+    - camera_settings: Dictionary containing the camera's position, focal point, and view up vector.
     """
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
-    mesh = mesh.smooth(n_iter=300)
+    mesh.smooth(n_iter=600)
     scalars = mesh.points[:, 2]
     
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False)
+
+    #plotter.add_mesh(mesh, color="white", show_edges=True)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False, show_scalar_bar=False)
+
+    # Set the camera position, focal point, and view up vector manually
+    camera_position = (10, 10, 10)  
+    focal_point = (0, 0, 0) 
+    view_up = (0, 0, 1)  
+    plotter.camera.position = camera_position
+    plotter.camera.focal_point = focal_point
+    plotter.camera.view_up = view_up
     
-    
-    plotter.camera.position = (0, 0, 10)
-    plotter.camera.focal_point = (0, 0, 0)
-    plotter.camera.up = (0, 1, 0)
+    plotter.show(screenshot=screenshot)
+    mesh.save(filename)
 
-    plotter.show_axes = False
-    plotter.background_color = 'white'
-    
-    
-    plotter.show(screenshot=filename)
+    # Retrieve the camera settings to ensure consistent usage
+    camera_settings = {
+        "position": plotter.camera.position,
+        "focal_point": plotter.camera.focal_point,
+        "view_up": plotter.camera.view_up
+    }
 
-def plot_3d_mesh_on_image(points_file, image_file):
-    points = np.loadtxt(points_file, delimiter=',')  # Adjust delimiter based on file format
+    return camera_settings
 
-    points = np.unique(points, axis=0)
-    cloud = pv.PolyData(points)
-
-    try:
-        mesh = cloud.delaunay_2d()
-    except Exception as e:
-        print(f"Failed to create a mesh: {e}")
-        return
-
-    if mesh.n_faces == 0:
-        print("No faces created in the mesh. Check the point data quality and distribution.")
-        return
-
-  
-    image = mpimg.imread(image_file)
-
-    fig, ax = plt.subplots()
-    ax.imshow(image)
-    ax.set_axis_off()
-
-   
-    x, y, _ = mesh.points.T
-    ax.scatter(x, y, color='red', s=1) 
-    try:
-        if mesh.faces.shape[1] == 4:
-            for f in mesh.faces.reshape(-1, 4):
-                v0, v1, v2 = f[1], f[2], f[3]
-                ax.plot(mesh.points[[v0, v1, v2, v0], 0], mesh.points[[v0, v1, v2, v0], 1], color='blue')
-        else:
-            print("Unexpected cell format in mesh")
-    except AttributeError:
-        print("Mesh faces are not in expected format. Possibly no valid mesh was created.")
-    except IndexError:
-        print("Error accessing mesh data. Check the integrity of the mesh structure.")
-
-    plt.show()
 
 
 
