@@ -311,34 +311,57 @@ class GridViz:
         scalars = mesh.points[:, 2]  
         self.plotter.subplot(*subplot)
         #self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
-        self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        #self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        self.plotter.add_points(mesh.points, color='green', point_size=5)
         self.plotter.add_axes()
 
     def add_mesh_polar(self, points, subplot):
+        x = points[:, 0]
+        y = points[:, 1]
+        z = points[:, 2]
+    
+        rho = np.sqrt(x**2 + y**2)
+        alpha = np.arctan2(y, x)
+        h = z
+    
+        points = np.vstack((rho, alpha, h)).T
+        #polar_points=np.column_stack((rho,alpha))
         # Visualize a 3D mesh from points in Polar coordinates
         scaler = StandardScaler()
         points = scaler.fit_transform(points)
+        #points = np.column_stack((polar_points, np.zeros(polar_points.shape[0])))
         cloud = pv.PolyData(points)
 
         mesh = cloud.delaunay_2d()
         mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
         self.plotter.subplot(*subplot)
-        #self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
-        self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, color='red', show_edges=False, render_points_as_spheres=True)
+        #self.plotter.add_points(mesh.points, color='green', point_size=5)
         self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h')
 
     def add_h_surface(self, points, subplot):
         # Visualize an H-Surface from points
-        points[:, 2] *= 3
+        x = points[:, 0]
+        y = points[:, 1]
+        z = points[:, 2]/points[:, 2]
+    
+        rho = np.sqrt(x**2 + y**2)
+        alpha = np.arctan2(y, x)
+        h = z
+    
+        points = np.vstack((rho, alpha, h)).T
+        #points[:, 2] *= 1
         cloud = pv.PolyData(points)
-        mesh = cloud.reconstruct_surface()
-        #mesh = mesh.smooth(n_iter=600)
+        mesh = cloud.delaunay_2d()
+        mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
         
         self.plotter.subplot(*subplot)
-        #self.plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars, show_scalar_bar=False)
-        self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        self.plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, color='white', show_edges=False)
+        #self.plotter.add_points(mesh.points, color='blue', point_size=5)
         self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h')
 
     def add_3dmesh_open(self, points, subplot):
@@ -360,10 +383,14 @@ class GridViz:
         new_scalars = np.interp(np.linspace(0, 1, num=extrude_mesh.n_points), 
                                 np.linspace(0, 1, num=len(points[:, 2])), 
                                 points[:, 2])
+        
+        c_pts=extrude_mesh.points
+
 
         self.plotter.subplot(*subplot)
         #self.plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
-        self.plotter.add_mesh(extrude_mesh, color='white', show_edges=False)
+        #self.plotter.add_mesh(extrude_mesh, color='white', show_edges=False)
+        self.plotter.add_points(c_pts, color='red', point_size=5)
         self.plotter.add_axes()
 
     def __call__(self):
@@ -440,14 +467,26 @@ def visualize_h_surface(points):
     """
     Visualizes the points as an H-Surface(heighted surface) using PyVista.
     """
-    points[:, 2] *= 3
+    x = points[:, 0]
+    y = points[:, 1]
+    z = points[:, 2]/points[:, 2]
+    
+    rho = np.sqrt(x**2 + y**2)
+    alpha = np.arctan2(y, x)
+    h = z
+    
+    points = np.vstack((rho, alpha, h)).T
+    #points[:, 2] *= 3
+    scaler=StandardScaler()
+    points=scaler.fit_transform(points)
     cloud = pv.PolyData(points)
     mesh = cloud.delaunay_2d()
     mesh=mesh.smooth(n_iter=600)
     scalars = mesh.points[:, 2]
 
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars,show_scalar_bar=False) 
+    #plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars,show_scalar_bar=False)
+    plotter.add_points(mesh.points, color='blue', point_size=5) 
     plotter.add_axes(interactive=True,xlabel='rho', ylabel='alpha', zlabel='h')
     plotter.show()
 

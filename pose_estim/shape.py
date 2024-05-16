@@ -13,10 +13,10 @@ def main():
 
    
     warp_field = WarpField(radius, height, vanishing_points, center, resolution)
-    control_points = np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/data/ControlPoints_Significant50_Z1.txt').reshape(20, 20, 3)
+    control_points = np.loadtxt('./data/control_points.txt').reshape(10, 10, 3)
     
     #control_points=np.random.rand(10,10,3)
-    #control_points = np.random.randint(100, size=(20, 20, 3))
+    #control_points = np.random.randint(10, size=(20, 20, 3))
     
     
 
@@ -38,6 +38,7 @@ def main():
     # visualize_3dmeshcart(mesh_points)
     # visualize_3dmeshpol(mesh_points) 
     #visualize_3dmeshopen(mesh_points) 
+    #visualize_h_surface(mesh_points)
 
 if __name__ == "__main__":
     main()
