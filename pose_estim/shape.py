@@ -13,30 +13,32 @@ def main():
 
    
     warp_field = WarpField(radius, height, vanishing_points, center, resolution)
-    control_points = np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/data/control_points10.txt').reshape(10, 10, 3)
+    control_points = np.loadtxt('./data/control_points.txt').reshape(10, 10, 3)
+    
+    #control_points=np.random.rand(10,10,3)
+    #control_points = np.random.randint(10, size=(20, 20, 3))
+    
+    
 
     #control_points=generate_control_points(radius,height,num_radial=10,num_height=10)
 
     warp_field.b_mesh_deformation(a=0.00051301747, b=0.0018595674, control_points=control_points)
     mesh_points = warp_field.extract_pts()
     #mesh_points=np.loadtxt('./data/mesh_points.txt', delimiter=',')
-    #np.savetxt('./data/mesh_points4.txt', mesh_points, fmt='%.6f', delimiter=',')
-    # mesh_points1=np.loadtxt('./data/mesh_points1.txt', delimiter=',')
-    # mesh_points2=np.loadtxt('./data/mesh_points2.txt', delimiter=',')
-    # mesh_points3=np.loadtxt('./data/mesh_points3.txt', delimiter=',')
-    #visualize_and_save_mesh_from_points(mesh_points1,'./rendering/mesh1.vtk',screenshot='./rendering/mesh1.png')
-    # visualize_and_save_mesh_from_points(mesh_points2,'./rendering/mesh2.vtk',screenshot='./rendering/mesh2.png')
-    # visualize_and_save_mesh_from_points(mesh_points3,'./rendering/mesh3.vtk',screenshot='./rendering/mesh3.png')
-    #visualize_and_save_mesh_from_points(mesh_points,'./rendering/mesh4.vtk',screenshot='./rendering/mesh4.png')
-
-    # cam_info=visualize_and_save_mesh_with_camera(mesh_points,'./rendering/mesh6.vtk','./rendering/mesh6.png')
-    # print('Cam info:', cam_info)
+    #np.savetxt('./data/mesh_points6.txt', mesh_points, fmt='%.6f', delimiter=',')
     
-    # plotter=GridViz(grid_shape=(1,3))
-    # plotter.add_h_surface(mesh_points,(0,0))
-    # plotter.add_mesh_cartesian(mesh_points,(0,1))
-    # plotter.add_mesh_polar(mesh_points,(0,2))
-    # plotter()
+    #visualize_and_save_mesh_from_points(mesh_points,'./rendering/mesh9.ply',screenshot='./rendering/mesh9.png')
+    plotter=GridViz(grid_shape=(2,2),window_size=(1600,1200))
+    plotter.add_h_surface(mesh_points,(0,0))
+    plotter.add_mesh_cartesian(mesh_points,(0,1))
+    plotter.add_mesh_polar(mesh_points,(1,0))
+    plotter.add_3dmesh_open(mesh_points,(1,1))
+    plotter()
+
+    # visualize_3dmeshcart(mesh_points)
+    # visualize_3dmeshpol(mesh_points) 
+    #visualize_3dmeshopen(mesh_points) 
+    #visualize_h_surface(mesh_points)
 
 if __name__ == "__main__":
     main()

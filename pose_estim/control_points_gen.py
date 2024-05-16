@@ -1,36 +1,34 @@
+
 import numpy as np
 
-# Define cylinder parameters
-radius = 500  # example radius
-height = 1000  # example height
-M = 20  # number of height divisions
-N = 20  # number of angular divisions
+M = 10  
+N = 10 
+rho_range = (0, 10)   
+alpha_range = (0, 360/N) 
+h_range = (0, 10)    
+width=512
+height=512
+vpx=0
+vpy=0
+vpz=10
 
-# Generate control points for minimal deformation (points on cylinder surface)
-control_points_minimal = np.zeros((M, N, 3))
+
+ 
+corners_3d = [(0, 0, 0), (width, 0, 0), (0, height, 0), (width, height, 0)]
+rho_max = max(np.sqrt((vpx - x)**2 + (vpy - y)**2 + vpz**2) for x, y, z in corners_3d)
+
+control_points = []
+
 for i in range(M):
-    h = i * height / (M - 1)
     for j in range(N):
-        angle = 2 * np.pi * j / N
-        x = radius * np.cos(angle)
-        y = radius * np.sin(angle)
-        control_points_minimal[i, j, :] = [x, y, h]
+        rho = np.random.uniform(0, rho_max)
+        alpha = np.random.uniform(*alpha_range)
+        h = np.random.uniform(*h_range)
+        control_points.append((rho, alpha, h))
 
-# Generate control points for significant deformation (distorted points)
-control_points_significant = np.zeros((M, N, 3))
-for i in range(M):
-    h = i * height / (M - 1) + np.random.uniform(-0.1, 0.1) * height  # slight random offset in height
-    for j in range(N):
-        perturbation = np.random.uniform(0.8, 1.0)  # random scaling factor
-        angle = 2 * np.pi * j / N + np.random.uniform(-0.5, 0.5)  # slight random offset in angle
-        x = radius * perturbation * np.cos(angle)
-        y = radius * perturbation * np.sin(angle)
-        control_points_significant[i, j, :] = [x, y, h]
 
-# Flatten arrays and convert to space-separated strings
-flat_minimal = control_points_minimal.reshape(-1, 3)
-flat_significant = control_points_significant.reshape(-1, 3)
+with open("./data/control_points.txt", "w") as file:
+    for point in control_points:
+        file.write(f"{point[0]} {point[1]} {point[2]}\n")
 
-# Save to text files
-np.savetxt('./data/ControlPoints_Minimal.txt', flat_minimal, fmt='%e', delimiter=' ')
-np.savetxt('./data/ControlPoints_Significant.txt', flat_significant, fmt='%e', delimiter=' ')
+control_points
