@@ -11,8 +11,7 @@ This repository contains the code and resources for the GutSLAM project, which f
 - Open3d
 - Pyvista
 - Matplotlib
-## Project Structure
-![image.png](/.eraser/m4vfOuvxwAZvp35jmydA___8QpfK1JLq0ZBFf9iXkdFQSwJAXI2___ZKOgp3npKJZu_rSum6usv.png "image.png")
+
 
 
 
