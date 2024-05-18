@@ -1,4 +1,4 @@
-<p><a target="_blank" href="https://app.eraser.io/workspace/m4vfOuvxwAZvp35jmydA" id="edit-in-eraser-github-link"><img alt="Edit in Eraser" src="https://firebasestorage.googleapis.com/v0/b/second-petal-295822.appspot.com/o/images%2Fgithub%2FOpen%20in%20Eraser.svg?alt=media&amp;token=968381c8-a7e7-472a-8ed6-4a6626da5501"></a></p>
+
 
 # Photometric 3D Reconstruction, Pose and Deformation Estimation in GutSLAM
 This repository contains the code and resources for the GutSLAM project, which focuses on photometric 3D reconstruction along with pose and deformation estimation techniques. The project utilizes advanced computer vision and photometric analysis to enhance SLAM (Simultaneous Localization and Mapping) applications in complex environments.
@@ -48,7 +48,7 @@ Scripts related to photometric reconstruction components of the project.
 
 
 <!-- eraser-additional-content -->
-## Diagrams
+## Project Architecture-Workflow
 <!-- eraser-additional-files -->
 <a href="/README-Project Workflow-1.eraserdiagram" data-element-id="rqRQfe4xZ9uwBx9FAw-if"><img src="/.eraser/m4vfOuvxwAZvp35jmydA___8QpfK1JLq0ZBFf9iXkdFQSwJAXI2___---diagram----61e4a6b63ef5d4daf26bf965b00ca3ae-Project-Workflow.png" alt="" data-element-id="rqRQfe4xZ9uwBx9FAw-if" /></a>
 <!-- end-eraser-additional-files -->
