@@ -1,0 +1,40 @@
+sequence-diagram
+
+title Project Workflow
+
+// Actors
+User [icon: user]
+System [icon: database, color: orange]
+Optimizer [icon: settings, color: blue]
+Renderer [icon: image, color: green]
+Logger [icon: file-text, color: grey]
+
+// Process start
+User > System: Request Data
+activate User
+
+System > Optimizer: Send initial data
+activate System
+
+loop [label: Data Processing] {
+    Optimizer > System: Query more data
+    System > Optimizer: Provide data
+}
+
+alt [label: Data Valid, color: lightgreen] {
+    Optimizer > Renderer: Send processed data
+    activate Renderer
+    Renderer > User: Display results
+    deactivate Renderer
+}
+else [label: Data Invalid, color: red] {
+    Optimizer > Logger: Log error
+    activate Logger
+    Logger > System: Error logged
+    deactivate Logger
+    System > User: Error notification
+}
+
+deactivate System
+deactivate User
+
