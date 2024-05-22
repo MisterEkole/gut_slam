@@ -217,7 +217,7 @@ def main():
     # plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
     # plot_on_image(image_path, projected_pts)
     #load_and_plot_mesh('./rendering/textured_gut_mesh.ply')
-    load_and_plot_mesh('./rendering/mesh9.ply')
+    load_and_plot_mesh('./rendering/mesh10.ply')
 
 
     

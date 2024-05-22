@@ -107,12 +107,10 @@ class WarpField:
         cp_x = control_points[:, :, 0].ravel()
         cp_y = control_points[:, :, 1].ravel()
         cp_z = control_points[:, :, 2].ravel()
-
-      
-    
-        spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N/20)
-        spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N/20)
-        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N/20)
+   
+        spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N)
+        spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N)
+        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N)
   
         pts = []
         for point in self.cylinder.points:
@@ -297,7 +295,7 @@ def euler_to_rot_mat(yaw, pitch, roll):
 ##=============================================================================
 
 class GridViz:
-    def __init__(self, grid_shape, window_size=(1200, 800)):
+    def __init__(self, grid_shape, window_size=(1300, 800)):
         # Initialize the plotter with a specified grid shape
         self.plotter = pv.Plotter(shape=grid_shape,window_size=window_size)
 
@@ -313,7 +311,8 @@ class GridViz:
         #self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
         #self.plotter.add_mesh(mesh, color='white', show_edges=False)
         self.plotter.add_points(mesh.points, color='green', point_size=5)
-        self.plotter.add_axes()
+        self.plotter.add_axes(line_width=5, interactive=True)
+        
 
     def add_mesh_polar(self, points, subplot):
         x = points[:, 0]
@@ -336,16 +335,16 @@ class GridViz:
         mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
         self.plotter.subplot(*subplot)
-        self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False,style='wireframe')
         #self.plotter.add_mesh(mesh, color='red', show_edges=False, render_points_as_spheres=True)
-        #self.plotter.add_points(mesh.points, color='green', point_size=5)
-        self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h')
+        self.plotter.add_points(mesh.points, color='green', point_size=5)
+        self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h', line_width=5)
 
     def add_h_surface(self, points, subplot):
         # Visualize an H-Surface from points
         x = points[:, 0]
         y = points[:, 1]
-        z = points[:, 2]/points[:, 2]
+        z = points[:, 2]
     
         rho = np.sqrt(x**2 + y**2)
         alpha = np.arctan2(y, x)
@@ -359,10 +358,10 @@ class GridViz:
         scalars = mesh.points[:, 2]
         
         self.plotter.subplot(*subplot)
-        self.plotter.add_mesh(mesh, show_edges=True, cmap='viridis', scalars=scalars, show_scalar_bar=False)
+        #self.plotter.add_mesh(mesh, show_edges=False, cmap='viridis', scalars=scalars, show_scalar_bar=False)
         #self.plotter.add_mesh(mesh, color='white', show_edges=False)
-        #self.plotter.add_points(mesh.points, color='blue', point_size=5)
-        self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h')
+        self.plotter.add_points(mesh.points, color='blue', point_size=5)
+        self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h',line_width=5)
 
     def add_3dmesh_open(self, points, subplot):
         """
@@ -388,10 +387,10 @@ class GridViz:
 
 
         self.plotter.subplot(*subplot)
-        #self.plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+        #self.plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis', show_edges=False, show_scalar_bar=False)
         #self.plotter.add_mesh(extrude_mesh, color='white', show_edges=False)
         self.plotter.add_points(c_pts, color='red', point_size=5)
-        self.plotter.add_axes()
+        self.plotter.add_axes(line_width=5, interactive=True)
 
     def __call__(self):
         # Display the plot when the instance is called
@@ -439,7 +438,7 @@ def visualize_3dmeshopen(points):
 
 
     plotter = pv.Plotter()
-    plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis',show_edges=True, show_scalar_bar=False)
+    plotter.add_mesh(extrude_mesh, scalars=new_scalars, cmap='viridis',show_edges=True, show_scalar_bar=False,style='wireframe')
     plotter.add_axes()
     plotter.show()
 
@@ -459,7 +458,9 @@ def visualize_3dmeshpol(points):
     scalars = mesh.points[:, 2]  # Use Z-coordinates for coloring
     plotter = pv.Plotter()
     plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+    #plotter.add_points(mesh.points, color='blue', point_size=5)
     plotter.add_axes(interactive=True,xlabel='r', ylabel='theta', zlabel='h')
+    
     #plotter.add_points(points, color='red', point_size=5)
     plotter.show()
 
@@ -469,7 +470,7 @@ def visualize_h_surface(points):
     """
     x = points[:, 0]
     y = points[:, 1]
-    z = points[:, 2]/points[:, 2]
+    z = points[:, 2]
     
     rho = np.sqrt(x**2 + y**2)
     alpha = np.arctan2(y, x)
@@ -535,11 +536,11 @@ def visualize_and_save_mesh_from_points(points, filename, screenshot=None):
     cloud = pv.PolyData(points)
 
     mesh = cloud.delaunay_2d()
-    mesh = mesh.smooth(n_iter=600)
+    mesh = mesh.smooth(n_iter=300)
     scalars = mesh.points[:, 2]
     plotter = pv.Plotter()
-    #plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=False, show_scalar_bar=False)
-    plotter.add_mesh(mesh, color="white", show_edges=False)
+    plotter.add_mesh(mesh, scalars=scalars, cmap='viridis', show_edges=True, show_scalar_bar=False)
+    #plotter.add_mesh(mesh, color="white", show_edges=False)
     #plotter.add_scalar_bar(title="Scene Deformation", label_font_size=10, title_font_size=10)
     plotter.show(screenshot=screenshot)
 
