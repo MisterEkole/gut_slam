@@ -13,38 +13,11 @@ import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
 import pyvista as pv
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-
-def create_custom_color_map():
-    colors=[(1,0,0),(0,1,0),(0,0,1)] #RGB
-    n_bins=100
-    cmap_name='custom_cmap'
-    return LinearSegmentedColormap.from_list(cmap_name,colors,N=n_bins)
-
-
 
 def polar_to_cartesian(rho, alpha, z):
     x = rho * np.cos(alpha)
     y = rho * np.sin(alpha)
     return x, y, z
-
-
-
-def generate_control_points_variable_h(M, N):
-    rho_range = (0, 500)
-    alpha_range = (0, 2 * np.pi)
-    h_range = (0, 1000)
-    
-    control_points = []
-    for i in range(M):
-        for j in range(N):
-            rho = np.random.uniform(*rho_range)
-            alpha = np.random.uniform(*alpha_range)
-            h = np.random.uniform(*h_range)
-            x, y, z = polar_to_cartesian(rho, alpha, h)
-            control_points.append((x, y, z))
-    return np.array(control_points).reshape(M, N, 3)
 
 # Function to generate a uniform grid of control points
 def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)):
@@ -208,7 +181,6 @@ class BMeshDeformation:
                     x += weight * spline_x.ev(h, theta)
                     y += weight * spline_y.ev(h, theta)
                     z += weight * spline_z.ev(h, theta)
-
             pts.append([x, y, z])  
 
         return np.array(pts)
@@ -218,22 +190,15 @@ N = 10
 # Generate a uniform grid of control points
 rho_step_size = 5  # Step size for rho
 alpha_step_size = 2*np.pi / 10 # Step size for alpha
-
-h_constant = 1
-control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None,h_variable_range=(0,50))
-#control_points = generate_control_points_variable_h(M, N)
-
-
-# Define the cylinder
 height = 100
 center = (0, 0)
-cylinder_points = np.array([[rho, alpha, z] for rho in np.linspace(0, 50, M) for alpha in np.linspace(0, 2 * np.pi, N) for z in np.linspace(0, 100, M)])
 
+cylinder_points = np.array([[rho, alpha, z] for rho in np.linspace(0, 50, M) for alpha in np.linspace(0, 2 * np.pi, N) for z in np.linspace(0, 100, M)])
+h_constant = 10
+control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None,h_variable_range=(0,10))
 bmd = BMeshDeformation(height, center, cylinder_points)
 deformed_points = bmd.b_mesh_deformation(1, 1, control_points)
-
 texture_img='./tex/colon_DIFF.png'
-
 
 viz = GridViz(grid_shape=(1, 3))
 viz.add_mesh_cartesian(deformed_points, subplot=(0, 0),texture_img=texture_img)

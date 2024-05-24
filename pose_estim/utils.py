@@ -637,4 +637,28 @@ def compute_a_b_values(image_path):
     #     # Update the texture with the modified data
     #     new_texture = pv.Texture(texture_array)
     #     self.plotter.add_mesh(mesh, texture=new_texture, show_edges=False, show_scalar_bar=False)
+    # Function to generate a uniform grid of control points
+# def polar_to_cartesian(rho, alpha, z):
+#     x = rho * np.cos(alpha)
+#     y = rho * np.sin(alpha)
+#     return x, y, z
+
+
+# def generate_uniform_grid_control_points(rho_step_size, alpha_step_size,z_step_size, h_constant=None, h_variable_range=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)):
+#     rho_values = np.arange(rho_range[0], rho_range[1] + rho_step_size, rho_step_size)
+#     alpha_values = np.arange(alpha_range[0], alpha_range[1] + alpha_step_size, alpha_step_size)
+#     z_values=np.arange(0,h_constant+z_step_size,z_step_size)
     
+#     control_points = []
+#     for z in z_values:
+#         for rho in rho_values:
+#             for alpha in alpha_values:
+#                 if h_constant is not None:
+#                     h = h_constant
+#                 else:
+#                     h = np.random.uniform(*h_variable_range)
+#                 x, y, z = polar_to_cartesian(rho, alpha, h)
+#                 control_points.append((x, y, z))
+
+#     #return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
+#     return np.array(control_points).reshape(len(z_values)*len(rho_values), len(alpha_values), 3)
