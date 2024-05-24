@@ -620,3 +620,21 @@ def compute_a_b_values(image_path):
     b_values=np.mean(b_values.ravel())
 
     return a_values, b_values
+ # def apply_texture_with_scalars(self, mesh, scalars, texture):
+    #     texture_image = texture.to_image()
+    #     width, height, _ = texture_image.dimensions
+    #     texture_array = texture_image.point_data.active_scalars.reshape((height, width, -1))
+
+        
+    #     normalized_scalars = (scalars - scalars.min()) / (scalars.max() - scalars.min())
+
+    #     # Adjust brightness of the texture based on the normalized scalars
+    #     for i, scalar in enumerate(normalized_scalars):
+    #         x, y = i % width, i // width
+    #         texture_array[y, x] = texture_array[y, x] * scalar
+    #     texture_array=np.clip(texture_array,0,255).astype(np.uint8)
+
+    #     # Update the texture with the modified data
+    #     new_texture = pv.Texture(texture_array)
+    #     self.plotter.add_mesh(mesh, texture=new_texture, show_edges=False, show_scalar_bar=False)
+    
