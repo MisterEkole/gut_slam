@@ -1,14 +1,12 @@
 
 import numpy as np
-
-# Define the ranges for generating the control points
 M = 10  
 N = 10 
-rho_range = (0, 500) 
-alpha_range = (0, 2 * np.pi) 
 h_range = (0, 1000)    
-width = 512
-height = 512
+
+
+rho_step_size = 5  # Step size for rho
+alpha_step_size = 2*np.pi / 10 # Step size for alpha
 
 # Function to convert polar coordinates to Cartesian coordinates
 def polar_to_cartesian(rho, alpha, z):
@@ -16,94 +14,28 @@ def polar_to_cartesian(rho, alpha, z):
     y = rho * np.sin(alpha)
     return x, y, z
 
-# Function to generate control points with constant z and convert to Cartesian coordinates
-def generate_control_points_constant_z(M, N, z_constant):
-    control_points = []
-    for i in range(M):
-        for j in range(N):
-            rho = np.random.uniform(*rho_range)
-            alpha = np.random.uniform(*alpha_range)
-            x, y, z = polar_to_cartesian(rho, alpha, z_constant)
-            control_points.append((x, y, z))
-    return control_points
 
-# Function to generate control points with variable h and convert to Cartesian coordinates
-def generate_control_points_variable_h(M, N):
+def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)): #default rho range can be changed, from 0 to rho max where rho max is the radius of the cylinder
+    rho_values = np.arange(rho_range[0], rho_range[1] + rho_step_size, rho_step_size)
+    alpha_values = np.arange(alpha_range[0], alpha_range[1] + alpha_step_size, alpha_step_size)
+    
     control_points = []
-    for i in range(M):
-        for j in range(N):
-            rho = np.random.uniform(*rho_range)
-            alpha = np.random.uniform(*alpha_range)
-            h = np.random.uniform(*h_range)
+    for rho in rho_values:
+        for alpha in alpha_values:
+            if h_constant is not None:
+                h = h_constant
+            else:
+                h = np.random.uniform(*h_variable_range)
             x, y, z = polar_to_cartesian(rho, alpha, h)
             control_points.append((x, y, z))
-    return control_points
 
-# Function to generate uniformly distributed control points with constant z and convert to Cartesian coordinates
-def generate_uniform_control_points_constant_z(M, N, z_constant):
-    control_points = []
-    rho_values = np.linspace(*rho_range, M)
-    alpha_values = np.linspace(*alpha_range, N)
-    for rho in rho_values:
-        for alpha in alpha_values:
-            x, y, z = polar_to_cartesian(rho, alpha, z_constant)
-            control_points.append((x, y, z))
-    return control_points
+    return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
+control_points=generate_uniform_grid_control_points(rho_step_size,alpha_step_size,h_constant=10,h_variable_range=None)
+control_points=control_points.reshape(-1,3)
+np.savetxt('./data/control_points.txt',control_points)
+print(control_points)
 
-# Function to generate uniformly distributed control points with variable h and convert to Cartesian coordinates
-def generate_uniform_control_points_variable_h(M, N):
-    control_points = []
-    rho_values = np.linspace(*rho_range, M)
-    alpha_values = np.linspace(*alpha_range, N)
-    for rho in rho_values:
-        for alpha in alpha_values:
-            h = np.random.uniform(*h_range)
-            x, y, z = polar_to_cartesian(rho, alpha, h)
-            control_points.append((x, y, z))
-    return control_points
-
-# Function to generate linearly spaced control points with constant z and convert to Cartesian coordinates
-def lin_control_points_constant_z(M, N, z_constant):
-    control_points = []
-    rho_values = np.linspace(*rho_range, M)
-    alpha_values = np.linspace(*alpha_range, N)
-    for rho in rho_values:
-        for alpha in alpha_values:
-            x, y, z = polar_to_cartesian(rho, alpha, z_constant)
-            control_points.append((x, y, z))
-    return control_points
-
-# Function to generate linearly spaced control points with variable h and convert to Cartesian coordinates
-def lin_control_points_variable_h(M, N):
-    control_points = []
-    rho_values = np.linspace(*rho_range, M)
-    alpha_values = np.linspace(*alpha_range, N)
-    h_values = np.linspace(*h_range, M * N)
-    idx = 0
-    for rho in rho_values:
-        for alpha in alpha_values:
-            h = h_values[idx]
-            x, y, z = polar_to_cartesian(rho, alpha, h)
-            control_points.append((x, y, z))
-            idx += 1
-    return control_points
-
-# Choose method to generate control points
-#method = "constant_z" 
-method = "variable_h"  # Change to "variable_h" for the other method
-
-if method == "constant_z":
-    z_constant = 1
-    control_points = generate_control_points_constant_z(M, N, z_constant)
-else:
-    control_points = generate_control_points_variable_h(M, N)
-
-# Save the control points to a file
-with open("./data/control_points15.txt", "w") as file:
-    for point in control_points:
-        file.write(f"{point[0]} {point[1]} {point[2]}\n")
-
-control_points
+print(control_points.shape)
 
 
 
