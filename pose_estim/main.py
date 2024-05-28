@@ -81,11 +81,6 @@ def main():
  
 
     projected_pts=projector.project_points(points_3d=cylinder_points)
-
-    #visualize_3dmeshpol(cylinder_points)
-    #visualize_3dmeshcart(cylinder_points)
-    #visualize_h_surface(cylinder_points)
-
     #visualize_mesh_on_image(cylinder_points,'projection.png')
 
    

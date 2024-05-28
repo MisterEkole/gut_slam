@@ -28,11 +28,5 @@ def main():
     plotter.add_3dmesh_open(mesh_points,(1,1))
     plotter()
 
-
-    #visualize_3dmeshcart(mesh_points)
-    #visualize_3dmeshpol(mesh_points) 
-    # visualize_3dmeshopen(mesh_points) 
-    # visualize_h_surface(mesh_points)
-
 if __name__ == "__main__":
     main()
