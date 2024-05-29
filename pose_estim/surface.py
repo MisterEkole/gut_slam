@@ -20,21 +20,42 @@ def polar_to_cartesian(rho, alpha, z):
     return x, y, z
 
 # Function to generate a uniform grid of control points
-def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)):
+# def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)):
+#     rho_values = np.arange(rho_range[0], rho_range[1] + rho_step_size, rho_step_size)
+#     alpha_values = np.arange(alpha_range[0], alpha_range[1] + alpha_step_size, alpha_step_size)
+    
+#     control_points = []
+#     for rho in rho_values:
+#         for alpha in alpha_values:
+#             if h_constant is not None:
+#                 h = h_constant
+#             else:
+#                 h = np.random.uniform(*h_variable_range)
+#             x, y, z = polar_to_cartesian(rho, alpha, h)
+#             control_points.append((x, y, z))
+
+#     return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
+
+
+def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, h_step_size=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)):
     rho_values = np.arange(rho_range[0], rho_range[1] + rho_step_size, rho_step_size)
     alpha_values = np.arange(alpha_range[0], alpha_range[1] + alpha_step_size, alpha_step_size)
-    
+
     control_points = []
     for rho in rho_values:
         for alpha in alpha_values:
             if h_constant is not None:
                 h = h_constant
             else:
-                h = np.random.uniform(*h_variable_range)
+                h_start, h_end = h_variable_range
+                h_values = np.arange(h_start, h_end + h_step_size, h_step_size)
+                #h = h_values[len(control_points) % len(h_values)]
+                h=h_values
             x, y, z = polar_to_cartesian(rho, alpha, h)
             control_points.append((x, y, z))
 
     return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
+
 class GridViz:
     def __init__(self, grid_shape, window_size=(2300, 1500)):
         self.plotter = pv.Plotter(shape=grid_shape, window_size=window_size)
@@ -285,19 +306,20 @@ class BMeshDeformation:
 
         return np.array(pts)
 
-M = 10
-N = 5
+M = 20
+N = 10
 # Generate a uniform grid of control points
 rho_step_size = 5  # Step size for rho
 alpha_step_size = 2*np.pi / 10 # Step size for alpha
+h_step_size=3
 height = 100
 center = (0, 0)
 
-cylinder_points = np.array([[rho, alpha, z] for rho in np.linspace(0, 10, M) for alpha in np.linspace(0, 2 * np.pi, N) for z in np.linspace(0, 100, M)])
+cylinder_points = np.array([[rho, alpha, z] for rho in np.linspace(0, 50, M) for alpha in np.linspace(0, 2 * np.pi, N) for z in np.linspace(0, 100, M)])
 h_constant = 10
-control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None,h_variable_range=(50,100))
-# control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
-# control_points=control_points.reshape(11,11,3)
+control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=10,h_variable_range=None, h_step_size=None)
+#control_points=np.loadtxt('./data/control_points.txt')
+#control_points=control_points.reshape(11,11,3)
 
 
 bmd = BMeshDeformation(height, center, cylinder_points)
@@ -307,9 +329,9 @@ texture_img='./tex/colon_DIFF.png'
 viz = GridViz(grid_shape=(1, 3))
 #singleViz=SingleWindowGridViz()
 #viz.add_mesh_cartesian(deformed_points, subplot=(0, 0),texture_img=texture_img)
-viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
-viz.add_h_surface(deformed_points, subplot=(0, 1),texture_img=texture_img)
-viz.add_mesh_open(deformed_points, subplot=(0, 2),texture_img=texture_img)
+viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=None)
+viz.add_h_surface(deformed_points, subplot=(0, 1),texture_img=None)
+viz.add_mesh_open(deformed_points, subplot=(0, 2),texture_img=None)
 
 #singleViz.visualize_and_save_mesh_with_camera(deformed_points,'./rendering/def_mesh.vtk',screenshot='./rendering/mesh.png',texture_img=texture_img)
 viz()

@@ -30,9 +30,9 @@ def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_const
             control_points.append((x, y, z))
 
     return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
-control_points=generate_uniform_grid_control_points(rho_step_size,alpha_step_size,h_constant=10,h_variable_range=None)
+control_points=generate_uniform_grid_control_points(rho_step_size,alpha_step_size,h_constant=None,h_variable_range=(50,100))
 control_points=control_points.reshape(-1,3)
-np.savetxt('./data/control_points.txt',control_points)
+np.savetxt('./data/control_points1.txt',control_points)
 print(control_points)
 
 print(control_points.shape)

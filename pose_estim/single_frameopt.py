@@ -180,7 +180,7 @@ def log_optim_params(optimized_params, frame_idx):
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/FrameBuffer_0037.png'
+    image_path = './rendering/mesh.png'
     # texture_img='./tex/colon_DIFF.png'
     # texture=pv.read_texture(texture_img)
     print("Optimization started...")

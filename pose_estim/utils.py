@@ -670,3 +670,28 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     pbar.update(1)
 
     return objective
+
+
+# def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, h_step_size=None, rho_range=(0, 50), alpha_range=(0, 2 * np.pi)):
+#     rho_values = np.arange(rho_range[0], rho_range[1] + rho_step_size, rho_step_size)
+#     alpha_values = np.arange(alpha_range[0], alpha_range[1] + alpha_step_size, alpha_step_size)
+    
+#     if h_constant is None and h_variable_range is not None and h_step_size is not None:
+#         h_values = np.arange(h_variable_range[0], h_variable_range[1] + h_step_size, h_step_size)
+#     else:
+#         h_values = [h_constant] if h_constant is not None else np.random.uniform(*h_variable_range, size=(len(rho_values), len(alpha_values)))
+
+#     control_points = []
+#     for i, rho in enumerate(rho_values):
+#         for j, alpha in enumerate(alpha_values):
+#             if h_constant is not None:
+#                 h = h_constant
+#             else:
+#                 if h_step_size is not None:
+#                     h = h_values[min(i, len(h_values)-1)]
+#                 else:
+#                     h = h_values[i, j]
+#             x, y, z = polar_to_cartesian(rho, alpha, h)
+#             control_points.append((x, y, z))
+
+#     return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
