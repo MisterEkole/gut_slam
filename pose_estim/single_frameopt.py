@@ -65,7 +65,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     a = 0.00051301747 
     b = 0.0018595674
 
-    deformed_points = points_3d.b_mesh_deformation(a, b, control_points)
+    deformed_points = points_3d.b_mesh_deformation(control_points)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     projected_2d_pts = projector.project_points(deformed_points)
@@ -194,8 +194,6 @@ def main():
     image_height, image_width = image.shape[:2]
     image_center = (image_width / 2, image_height / 2, 0)
     radius = 50  # Adjusted to match rho_max
-    height = 100
-    vanishing_pts = (0, 0, 10)
     center = image_center
     # rho_step_size = 5
     # alpha_step_size = 2*np.pi / 10
@@ -221,11 +219,7 @@ def main():
     gamma = 2.2
     init_lambda_ortho = 1
     init_lambda_det = 1
-    M=5
-    N=5
- 
-    cylinder_points = generate_cylinder_points(radius, height, M,N)
-    points_3d=BMeshDeformation(height,center,cylinder_points)
+    points_3d=BMeshDeformation(radius,center)
     
 
     initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(),control_points.ravel(),init_lambda_ortho, init_lambda_det])
