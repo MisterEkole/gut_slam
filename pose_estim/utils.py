@@ -389,8 +389,7 @@ class BMeshDeformationC:
         heights, angles = np.meshgrid(heights, angles)
         heights = heights.ravel()
         angles = angles.ravel()
-        cp_x = control_points[:, :, 0].ravel()
-        cp_y = control_points[:, :, 1].ravel()
+      
         cp_z = control_points[:, :, 2].ravel()
 
      
