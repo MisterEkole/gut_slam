@@ -68,24 +68,22 @@ optimization_errors=[]
 
 
 ''' Objective function with ortho and det constrains on Rot Mat using Lagrange Multipliers'''
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, lambda_ortho, lambda_det,pbar):
+def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, b_mesh_deformation, lambda_ortho, lambda_det,pbar):
     # Unpacking parameters
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    control_points=params[12:-2].reshape(10,10,3)
+    control_points=params[12:-2].reshape(11,11,3)
     lambda_ortho = params[-2]
     lambda_det = params[-1]
-    a=0.00051301747 
-    b=0.0018595674
-   
+    image_height, image_width = image.shape[:2]
 
+    points_3d=BMeshDeformation(radius=50,center=(image_height/2,image_width/2,0))
+    deformed_pts=points_3d.b_mesh_deformation(control_points)
     
-    warp_field.b_mesh_deformation(a=a, b=b, control_points=control_points)
-    points_3d_deformed = warp_field.extract_pts()
-    
+ 
     # Project points
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-    projected_2d_pts = projector.project_points(points_3d_deformed)
+    projected_2d_pts = projector.project_points(deformed_pts)
     if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
         projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
@@ -95,7 +93,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     # Compute reprojection and photometric errors
     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
     photometric_error = []
-    for pt2d, pt3d in zip(projected_2d_pts, points_3d_deformed):
+    for pt2d, pt3d in zip(projected_2d_pts, deformed_pts):
         x, y, z = pt3d
         L = calib_p_model(x, y, z, k, g_t, gamma)
         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
@@ -105,9 +103,6 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
             C = 0
         photometric_error.append(float(C))
     photometric_error = np.array(photometric_error, dtype=float)
-    
- 
-
      #Normalize each error type to the same scale
     reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
     photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
@@ -134,11 +129,9 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     return objective
 
 
-def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx,a,b):
+def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, frame_idx):
     global optimization_errors
     optimization_errors = []
-    # lower_bounds = [-np.inf]*14 + [0, 0]  # Assuming non-negative values for the Lagrange multipliers
-    # upper_bounds = [np.inf]*14 + [np.inf, np.inf]
     num_params = len(initial_params)
     lower_bounds = [-np.inf] * num_params
     upper_bounds = [np.inf] * num_params
@@ -149,7 +142,7 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
         result = least_squares(
             objective_function,
             initial_params,
-            args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, warp_field, 1, 1,pbar),#1,1 lambda ortho, lambda det init
+            args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, 1, 1,frame_idx,pbar),#1,1 lambda ortho, lambda det init
             method='dogbox',
             #bounds=(lower_bounds, upper_bounds),
             max_nfev=50,
@@ -180,9 +173,9 @@ def log_errors(errors, frame_idx):
         f.write(f"Mean Photometric Error: {mean_photometric_error:.4f}\n\n")  
 
 
-def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, warp_field, frame_idx,control_points):
+def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, b_mesh_deformation, frame_idx):
     points_2d_observed = Project3D_2D_cam(intrinsic_matrix, initial_params[:9].reshape(3, 3), initial_params[9:12]).project_points(points_3d)
-    optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field,control_points)
+    optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, b_mesh_deformation,frame_idx)
     return optimized_params
 def detect_feature_points(image):
     orb = cv2.ORB_create()
@@ -222,13 +215,16 @@ def main():
     k = 2.5
     g_t = 2.0
     gamma = 2.2
-
-    control_points = np.loadtxt('./data/control_points10.txt').reshape(10, 10, 3)
-
-   
     init_lambda_ortho, init_lambda_det = 1, 1
+    control_points=np.loadtxt('./data/control_points.txt')
+    control_points=control_points.reshape(11,11,3)
+    radius=50 #adjusted to match rho max
+    # rho_step_size=5
+    # alpha_step_size=2*np.pi/10
 
-    optimized_params = None
+    
+
+    optimized_params = None #<--- this line indicates that the optim params of the previous frame will be used for optim of susbsequent frame
 
 
     for frame_idx, image in enumerate(frames):
@@ -239,14 +235,12 @@ def main():
             continue
 
         image_height, image_width = image.shape[:2]
-
+        center=(image_width/2,image_height/2,0)
+        points_3d=BMeshDeformation(radius,center)
+        points_3d=points_3d.b_mesh_deformation(control_points)
      
+      
         points_2d_observed = detect_feature_points(image)
-
-        
-        warp_field = WarpField(radius=500, height=1000, vanishing_pts=(0, 0, 10), center=(image_width / 2, image_height / 2, 0), resolution=100)
-        warp_field.b_mesh_deformation(a=0.00051301747 , b=0.0018595674, control_points=control_points)
-        cylinder_points = warp_field.extract_pts()
 
         #init cam pose
         z_vector = np.array([0, 0, 10])
@@ -260,14 +254,14 @@ def main():
         trans_mat = np.array([0, 0, 10])
 
     
-        intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center=(image_width / 2, image_height / 2, 0))
+        intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)
 
        
         initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(), control_points.ravel(), init_lambda_ortho, init_lambda_det])
 
        
         optim_start_time = time.time()
-        optimized_params = optimize_params(cylinder_points, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, warp_field, frame_idx, a=0.43613728652325934, b=0.0018595670614189284)
+        optimized_params = optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, frame_idx)
         optim_end_time = time.time()
 
         optim_time = optim_end_time - optim_start_time

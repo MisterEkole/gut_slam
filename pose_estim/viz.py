@@ -177,9 +177,7 @@ def main():
     image_height, image_width = image.shape[:2]
     image_center = (image_height/2, image_width/2, 0)
     center = image_center
-    # cam_info={'position':(4.310669534819416, 5.074316599765719, 4.636957423146306),
-    #     'focal_point':(-0.14862758317728766, 0.6150194817690126, 0.17766030514960568),
-    #         'view_up': (0.0, 0.0, 1.0)}
+    
     cam_info={'position':(4.442435128936857, 4.892312186729204, 4.68719624206537),
         'focal_point':(-0.016861989059850247, 0.43301506873249845, 0.2278991240686753),
             'view_up': (0.0, 0.0, 1.0)}
