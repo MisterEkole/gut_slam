@@ -615,33 +615,62 @@ class SingleWindowGridViz:
 
 
 '''loads a mesh file and plot it'''
-def load_and_plot_mesh(file_path):
+def load_and_plot_mesh(file_path, texture_img=None):
     mesh = pv.read(file_path)
+    scaler = StandardScaler()
+    mesh.points = scaler.fit_transform(mesh.points)
+    mesh = mesh.delaunay_2d()
+    mesh = mesh.smooth(n_iter=600)
+    
+    # Extract and normalize z-values
     z_values = mesh.points[:, 2]
     z_min, z_max = z_values.min(), z_values.max()
     z_normalized = (z_values - z_min) / (z_max - z_min)
-
-    # Create custom colors mimicking human gut color
-    base_color = np.array([1.0, 0.5, 0.5])  # Pinkish-red
-    variation_strength = 0.1
-    colors = np.tile(base_color, (mesh.n_points, 1))
-    #colors += variation_strength * np.random.uniform(-1, 1, colors.shape)
     
-
-    #introduce variation in color intensity based on normalized z val
+    # Generate colors based on height variation
+    base_color = np.array([1.0, 0.5, 0.5])  # Pinkish-red
     intensity_variation = np.random.uniform(0.8, 1.2, mesh.n_points).reshape(-1, 1)
     height_based_variation = (z_normalized * 0.5 + 0.5).reshape(-1, 1)
-    colors *= intensity_variation * height_based_variation
-
+    colors = base_color * intensity_variation * height_based_variation
     colors = np.clip(colors, 0, 1)
-
     mesh.point_data['colors'] = colors
-
+    
+    # Plot mesh
     plotter = pv.Plotter()
-    plotter.add_mesh(mesh, scalars='colors', rgb=True)
+    
+    if texture_img is not None:
+        # Apply texture
+        mesh.texture_map_to_plane(inplace=True)
+        texture = pv.read_texture(texture_img)
+        
+        # Create and modify texture based on scalars
+        texture_image = texture.to_image()
+        width, height, _ = texture_image.dimensions
+        texture_array = texture_image.point_data.active_scalars.reshape((height, width, -1))
+        
+        normalized_scalars = (z_values - z_values.min()) / (z_values.max() - z_values.min())
+        if mesh.active_texture_coordinates is None or len(mesh.active_texture_coordinates) == 0:
+            mesh.texture_map_to_plane(inplace=True)
+        
+        texture_coordinates = mesh.active_texture_coordinates
+        for i, (u, v) in enumerate(texture_coordinates):
+            x = int(u * (width - 1))
+            y = int(v * (height - 1))
+            x = np.clip(x, 0, width - 1)
+            y = np.clip(y, 0, height - 1)
+            factor = normalized_scalars[i]
+            texture_array[y, x] = texture_array[y, x] * factor
+        
+        texture_array = np.clip(texture_array, 0, 255).astype(np.uint8)
+        modified_texture = pv.Texture(texture_array.reshape((height, width, -1)))
+        
+        plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
+    else:
+        # Apply colors
+        plotter.add_mesh(mesh, scalars='colors', rgb=True, show_edges=False, show_scalar_bar=False)
+    
     plotter.set_background("white")
     plotter.show()
-
 
 
 

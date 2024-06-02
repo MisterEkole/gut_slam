@@ -228,7 +228,7 @@ class BMeshDeformation:
         self.radius = radius
         self.center = center
 
-    def b_mesh_deformation(self, control_points):
+    def b_mesh_deformation(self, a,b,control_points):
         M, N, _ = control_points.shape
 
         radius = np.linspace(0, self.radius, M)
@@ -243,20 +243,31 @@ class BMeshDeformation:
         spline_z = SmoothBivariateSpline(radius, angles, cp_z, s=M * N)
 
         pts = []
+        B_i = np.zeros(M)
+        B_j = np.zeros(N)
+
+        for i in range(M):
+            B_i[i] = (b / (2 * np.pi)) ** i * (1 - b / (2 * np.pi)) ** (M - i)
+            B_i /= np.linalg.norm(B_i, ord=2)
+        for j in range (N):
+            B_j[j] = (a / np.max(a+b)) * (1 - a / np.max(a+b)) ** (N - j)
+            B_j /= np.linalg.norm(B_j, ord=2)
+
         for i in range(M):
             for j in range(N):
+                weight = B_i[i] * B_j[j] 
                 h = radius[i * N + j]
                 theta = angles[i * N + j]
-                x = control_points[i, j, 0]  
-                y = control_points[i, j, 1] 
-                z = spline_z.ev(h, theta)
+                x = control_points[i, j, 0]*weight
+                y = control_points[i, j, 1]*weight
+                z = spline_z.ev(h, theta)*weight
                 pts.append([x, y, z])
 
         return np.array(pts)
 
 
 
-M = 30
+M = 20
 N = 10
 # Generate a uniform grid of control points
 rho_step_size = 10  # Step size for rho
@@ -264,15 +275,15 @@ alpha_step_size = (2 * np.pi )/ 10  # Step size for alpha
 radius = 100
 center = (0, 0)
 
-control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_variable_range=(0,100),h_step_size=2*np.pi/50)
+control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_variable_range=(0,100),h_step_size=10)
 
 bmd = BMeshDeformation(radius=radius, center=center)
-deformed_points = bmd.b_mesh_deformation(control_points)
+deformed_points = bmd.b_mesh_deformation(a=1,b=1,control_points=control_points)
 texture_img = './tex/colon_DIFF.png'
 
 viz = GridViz(grid_shape=(1, 3))
-viz.add_mesh_polar(deformed_points, subplot=(0, 0), texture_img=texture_img)
-viz.add_h_surface(deformed_points, subplot=(0, 1), texture_img=texture_img)
-viz.add_mesh_cartesian(deformed_points,subplot=(0,2), texture_img=texture_img)
+viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
+viz.add_h_surface(deformed_points, subplot=(0, 1),texture_img=texture_img)
+viz.add_mesh_cartesian(deformed_points,subplot=(0,2),texture_img=texture_img)
 
 viz()

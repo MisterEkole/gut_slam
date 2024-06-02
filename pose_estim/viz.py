@@ -1,6 +1,6 @@
 '''
 -------------------------------------------------------------
-Visualize 3D Mesh Wireframe on 2D Image
+Visualize Mesh Wireframe and Mesh Points on 2D Image
 Author: Mitterand Ekole
 Date: 02-05-2024
 -------------------------------------------------------------
@@ -169,6 +169,7 @@ def calculate_rotation_matrix(position, focal_point, view_up):
 def main():
     image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/mesh9.png'
     image = cv2.imread(image_path)
+    texture_img = './tex/colon_DIFF.png'
 
     if image is None:
         print("Error: Image not found.")
@@ -215,13 +216,7 @@ def main():
     # plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
     # plot_on_image(image_path, projected_pts)
     #load_and_plot_mesh('./rendering/textured_gut_mesh.ply')
-    load_and_plot_mesh('./rendering/mesh10.ply')
-
-
-    
-
-  
-
+    load_and_plot_mesh('./rendering/mesh1.vtk',texture_img=texture_img)
 if __name__ == "__main__":
     main()
 
