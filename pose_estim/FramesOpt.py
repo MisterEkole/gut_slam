@@ -182,7 +182,7 @@ def detect_feature_points(image):
     orb = cv2.ORB_create()
     kp=orb.detect(image,None)
     kp=cv2.KeyPoint_convert(kp)
-    return kp
+    return np.array(kp)
 
 
 def log_optim_params(optimized_params, frame_idx):
@@ -202,11 +202,13 @@ def log_optim_params(optimized_params, frame_idx):
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 def main():
-    frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S2'
+    frames_directory = '/Users/ekole/Dev/gut_slam/gut_images/Frames_S2000'
+    frame_data=read_csv('/Users/ekole/Dev/gut_slam/gut_images/camera_poses_s2000.csv')
     print("Optimization started...")
     start_time = time.time()
 
     frames = load_frames_from_directory(frames_directory)
+    start_frame_idx=500 #choose desired start index for frame default is 0 for 
     total_optim_time = 0
 
     # Constants for optimization--- light model parameters
@@ -222,7 +224,7 @@ def main():
 
     optimized_params = None
 
-    for frame_idx, image in enumerate(frames):
+    for frame_idx, image in enumerate(frames[start_frame_idx:],start=start_frame_idx):
         print("Processing Frame:", frame_idx)
 
         if image is None:
@@ -236,17 +238,21 @@ def main():
         points_2d_observed = detect_feature_points(image)
         points_3d=BMeshDeformation(radius,center)
         points_3d=points_3d.b_mesh_deformation(control_points)
-
-       
-        z_vector = np.array([0, 0, 10])
-        z_unit_vector = z_vector / np.linalg.norm(z_vector)
-        x_camera_vector = np.array([1, 0, 0])
-        y_vector = np.cross(z_unit_vector, x_camera_vector)
-        x_vector = np.cross(z_unit_vector, y_vector)
-        x_vector /= np.linalg.norm(x_vector)
-        y_vector /= np.linalg.norm(y_vector)
-        rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-        trans_mat = np.array([0, 0, 10])
+        
+        if frame_idx in frame_data:
+            trans_mat=frame_data[frame_idx]['translation']
+            euler_angles=frame_data[frame_idx]['euler_angles']
+            rot_mat=euler_to_rotation_matrix(euler_angles)
+        else:
+            z_vector = np.array([0, 0, 10])
+            z_unit_vector = z_vector / np.linalg.norm(z_vector)
+            x_camera_vector = np.array([1, 0, 0])
+            y_vector = np.cross(z_unit_vector, x_camera_vector)
+            x_vector = np.cross(z_unit_vector, y_vector)
+            x_vector /= np.linalg.norm(x_vector)
+            y_vector /= np.linalg.norm(y_vector)
+            rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+            trans_mat = np.array([0, 0, 10])
 
     
         intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)

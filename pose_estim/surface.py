@@ -15,16 +15,24 @@ from scipy.interpolate import SmoothBivariateSpline
 import pyvista as pv
 from sklearn.preprocessing import StandardScaler
 
-def polar_to_cartesian(rho, alpha, z):
+def polar_to_cartesian(rho, alpha,h):
     x = rho * np.cos(alpha)
     y = rho * np.sin(alpha)
-    return x, y, z
+    z=h
+    
+    return x, y,z
+
+def polar_to_cartesian_with_vp(rho, alpha, vp_x, vp_y, z):
+  x = rho * np.cos(alpha) + vp_x
+  y = rho * np.sin(alpha) + vp_y
+  return x, y, z
 
 def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=None, h_variable_range=None, h_step_size=None, rho_range=(0, 100), alpha_range=(0, 2 * np.pi)):
     rho_values = np.arange(rho_range[0], rho_range[1] + rho_step_size, rho_step_size)
     alpha_values = np.arange(alpha_range[0], alpha_range[1] + alpha_step_size, alpha_step_size)
 
     control_points = []
+    
     for rho in rho_values:
         for alpha in alpha_values:
             if h_constant is not None:
@@ -33,8 +41,10 @@ def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_const
                 h_start, h_end = h_variable_range
                 h_values = np.arange(h_start, h_end + h_step_size, h_step_size)
                 h = h_values[len(control_points) % len(h_values)]
-            #x, y, z = polar_to_cartesian(rho, alpha, h)
+                #h = 1/(rho+10e-6)
+          
             control_points.append((rho, alpha, h))
+
 
     return np.array(control_points).reshape(len(rho_values), len(alpha_values), 3)
 
@@ -42,30 +52,30 @@ class GridViz:
     def __init__(self, grid_shape, window_size=(2300, 1500)):
         self.plotter = pv.Plotter(shape=grid_shape, window_size=window_size)
 
-    ''' cartesian coords'''
-
     def add_mesh_cartesian(self, points, subplot, texture_img=None):
         rho = points[:, 0]
         alpha = points[:, 1]
         h = points[:, 2]
-        x,y,z=polar_to_cartesian(rho,alpha,h)
+        x, y, z = polar_to_cartesian(rho, alpha, h)
+        #x,y,z=polar_to_cartesian_with_vp(rho=rho,alpha=alpha,z=h,vp_x=10,vp_y=10)
         points = np.vstack((x, y, z)).T
         scaler = StandardScaler()
         points = scaler.fit_transform(points)
         cloud = pv.PolyData(points)
         mesh = cloud.delaunay_2d()
-        mesh=mesh.smooth(n_iter=600)
+        mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
         self.plotter.subplot(*subplot)
-
         if texture_img is not None:
             mesh.texture_map_to_plane(inplace=True)
             texture = pv.read_texture(texture_img)
             self.apply_texture_with_scalars(mesh, scalars=scalars, texture=texture)
         else:
-            self.plotter.add_points(mesh.points, color='green', point_size=5)
+            self.plotter.add_points(points, color='green', point_size=5)
         self.plotter.add_axes(line_width=5, interactive=True)
-        ''' Polar coordinates'''
+
+        "Polar Coord Plots"
+
     def add_mesh_polar(self, points, subplot, texture_img=None):
         scaler = StandardScaler()
         points = scaler.fit_transform(points)
@@ -74,74 +84,47 @@ class GridViz:
         mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
         self.plotter.subplot(*subplot)
-
         if texture_img is not None:
             mesh.texture_map_to_plane(inplace=True)
             texture = pv.read_texture(texture_img)
             self.apply_texture_with_scalars(mesh, scalars=scalars, texture=texture)
         else:
-            self.plotter.add_points(mesh.points, color='green', point_size=5)
-        self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h', line_width=5)
-    
-    ''' cylindrical coordinates'''
+            self.plotter.add_points(points, color='green', point_size=5)
+        self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h', line_width=5)
 
-    def add_h_surface(self, points, subplot, texture_img=None):
-       
+        ''' Cylindrical Coord Plots'''
+    def add_mesh_cy(self, points, subplot, texture_img=None):
+        rho = points[:, 0]
+        alpha = points[:, 1]
+        h = points[:, 2]
+        x=rho*np.cos(alpha)
+        y=rho*np.sin(alpha)
+        r=np.sqrt(x**2+y**2)
+        theta=alpha
+        #r,theta,h=polar_to_cylindrical(rho,alpha,h)
+        points = np.vstack((r, theta, h)).T
         scaler = StandardScaler()
         points = scaler.fit_transform(points)
         cloud = pv.PolyData(points)
         mesh = cloud.delaunay_2d()
         mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
-        
         self.plotter.subplot(*subplot)
         if texture_img is not None:
             mesh.texture_map_to_plane(inplace=True)
             texture = pv.read_texture(texture_img)
             self.apply_texture_with_scalars(mesh, scalars=scalars, texture=texture)
         else:
-            self.plotter.add_points(mesh.points, color='green', point_size=5)
-        self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h', line_width=5)
-    
+            self.plotter.add_points(points, color='green', point_size=5)
+        self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h', line_width=5)
 
-    ''' cartesian coord'''
-    
-    def add_mesh_open(self, points, subplot, texture_img=None):
-        rho = points[:, 0]
-        alpha = points[:, 1]
-        h = points[:, 2]
-        x,y,z=polar_to_cartesian(rho,alpha,h)
-        points = np.vstack((x, y, z)).T
-        scaler = StandardScaler()
-        points = scaler.fit_transform(points)
-        cloud = pv.PolyData(points)
-        mesh = cloud.delaunay_2d()
-        direction = (0, 0, 5)
-        extrude_mesh = mesh.extrude(vector=direction, capping=False)
-        new_scalars = np.interp(np.linspace(0, 1, num=extrude_mesh.n_points), 
-                                np.linspace(0, 1, num=len(points[:, 2])), 
-                                points[:, 2])
-        
-        c_pts = extrude_mesh.points
-        self.plotter.subplot(*subplot)
-
-        if texture_img is not None:
-            extrude_mesh.texture_map_to_plane(inplace=True)
-            texture = pv.read_texture(texture_img)
-            self.apply_texture_with_scalars(extrude_mesh, scalars=new_scalars, texture=texture)
-        else:
-            self.plotter.add_points(c_pts, color='green', point_size=5)
-        self.plotter.add_axes(line_width=5, interactive=True)
-    
     def apply_texture_with_scalars(self, mesh, scalars, texture):
         texture_image = texture.to_image()
         width, height, _ = texture_image.dimensions
         texture_array = texture_image.point_data.active_scalars.reshape((height, width, -1))
-
         normalized_scalars = (scalars - scalars.min()) / (scalars.max() - scalars.min())
         if mesh.active_texture_coordinates is None or len(mesh.active_texture_coordinates) == 0:
             mesh.texture_map_to_plane(inplace=True)
-      
         texture_coordinates = mesh.active_texture_coordinates
         for i, (u, v) in enumerate(texture_coordinates):
             x = int(u * (width - 1))
@@ -153,7 +136,7 @@ class GridViz:
         texture_array = np.clip(texture_array, 0, 255).astype(np.uint8)
         modified_texture = pv.Texture(texture_array.reshape((height, width, -1)))
         self.plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
-    
+
     def __call__(self):
         self.plotter.show()
 
@@ -172,6 +155,7 @@ class SingleWindowGridViz:
         points = scaler.fit_transform(points)
         cloud = pv.PolyData(points)
         mesh = cloud.delaunay_2d()
+      
         mesh = mesh.smooth(n_iter=600)
         scalars = mesh.points[:, 2]
         
@@ -228,62 +212,95 @@ class BMeshDeformation:
         self.radius = radius
         self.center = center
 
-    def b_mesh_deformation(self, a,b,control_points):
+    def b_mesh_deformation(self,control_points):
         M, N, _ = control_points.shape
 
-        radius = np.linspace(0, self.radius, M)
-        angles = np.linspace(0, 2 * np.pi, N, endpoint=True)
-       
+        rho = control_points[:, :, 0].flatten()
+        alpha = control_points[:, :, 1].flatten()
+        cp_h = control_points[:, :, 2].flatten()
 
-        radius, angles = np.meshgrid(radius, angles)
-        radius = radius.ravel()
-        angles = angles.ravel()
-        cp_z = control_points[:, :, 2].ravel()
-
-        spline_z = SmoothBivariateSpline(radius, angles, cp_z, s=M * N)
+        spline_z = SmoothBivariateSpline(rho, alpha, cp_h, s=M * N)
 
         pts = []
-        B_i = np.zeros(M)
-        B_j = np.zeros(N)
-
-        for i in range(M):
-            B_i[i] = (b / (2 * np.pi)) ** i * (1 - b / (2 * np.pi)) ** (M - i)
-            B_i /= np.linalg.norm(B_i, ord=2)
-        for j in range (N):
-            B_j[j] = (a / np.max(a+b)) * (1 - a / np.max(a+b)) ** (N - j)
-            B_j /= np.linalg.norm(B_j, ord=2)
-
         for i in range(M):
             for j in range(N):
-                weight = B_i[i] * B_j[j] 
-                h = radius[i * N + j]
-                theta = angles[i * N + j]
-                x = control_points[i, j, 0]*weight
-                y = control_points[i, j, 1]*weight
-                z = spline_z.ev(h, theta)*weight
-                pts.append([x, y, z])
+                h = rho[i * N + j]
+                theta = alpha[i * N + j]
+                x = control_points[i, j, 0]
+                y = control_points[i, j, 1]
+                h = spline_z.ev(h, theta)
+                pts.append([x, y, h])
+
+        return np.array(pts)
+''' dense splines'''
+class BMeshDeformationC:
+    def __init__(self, radius, center):
+        self.radius = radius
+        self.center = center
+
+    def b_mesh_deformation(self, a, b, control_points, subsample_factor=2):
+        M, N, _ = control_points.shape
+
+        rho = control_points[:, :, 0].flatten()
+        alpha = control_points[:, :, 1].flatten()
+        cp_h = control_points[:, :, 2].flatten()
+
+        spline_z = SmoothBivariateSpline(rho, alpha, cp_h, s=M * N)
+
+        pts = []
+        for i in range(M - 1):
+            for j in range(N - 1):
+           
+                h1, h2 = control_points[i, j, 0], control_points[i + 1, j, 0]
+                theta1, theta2 = control_points[i, j, 1], control_points[i, j + 1, 1]
+                z1, z2 = control_points[i, j, 2], control_points[i + 1, j, 2]
+
+               
+                for k in range(subsample_factor):
+                    for l in range(subsample_factor):
+                        frac_k = k / subsample_factor
+                        frac_l = l / subsample_factor
+
+                        new_h = h1 + frac_k * (h2 - h1)
+                        new_theta = theta1 + frac_l * (theta2 - theta1)
+                        new_z = spline_z.ev(new_h, new_theta)
+
+                        pts.append([new_h, new_theta, new_z])
+
+     
+        for i in range(M):
+            for j in range(N):
+                if i == M - 1 or j == N - 1:
+                    h = control_points[i, j, 0]
+                    theta = control_points[i, j, 1]
+                    z = control_points[i, j, 2]
+                    pts.append([h, theta, z])
 
         return np.array(pts)
 
 
 
-M = 20
-N = 10
-# Generate a uniform grid of control points
-rho_step_size = 10  # Step size for rho
+rho_step_size = 5  # Step size for rho
 alpha_step_size = (2 * np.pi )/ 10  # Step size for alpha
 radius = 100
 center = (0, 0)
 
-control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_variable_range=(0,100),h_step_size=10)
+#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_variable_range=(0,100),h_step_size=2*np.pi/100)
+control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
+control_points=control_points.reshape(11,11,3)
+#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=1)
+
 
 bmd = BMeshDeformation(radius=radius, center=center)
-deformed_points = bmd.b_mesh_deformation(a=1,b=1,control_points=control_points)
+deformed_points = bmd.b_mesh_deformation(control_points=control_points)
 texture_img = './tex/colon_DIFF.png'
 
 viz = GridViz(grid_shape=(1, 3))
 viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
-viz.add_h_surface(deformed_points, subplot=(0, 1),texture_img=texture_img)
+viz.add_mesh_cy(deformed_points, subplot=(0, 1),texture_img=texture_img)
 viz.add_mesh_cartesian(deformed_points,subplot=(0,2),texture_img=texture_img)
+# viz.add_mesh_polar(deformed_points, subplot=(0, 0))
+# viz.add_mesh_cy(deformed_points, subplot=(0, 1))
+# viz.add_mesh_cartesian(deformed_points,subplot=(0,2))
 
 viz()

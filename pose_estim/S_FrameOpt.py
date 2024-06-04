@@ -75,6 +75,9 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
     points_2d_observed = points_2d_observed.reshape(-1, 2)
+
+    # print(f"Projected points shape: {projected_2d_pts.shape}")
+    # print(f"Observed points shape: {points_2d_observed.shape}")
     
     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
     photometric_error = []
@@ -181,7 +184,7 @@ def log_optim_params(optimized_params, frame_idx):
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/Frames_S2000/0009.tif'
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/Frames_S2000/0774.tif'
     # texture_img='./tex/colon_DIFF.png'
     # texture=pv.read_texture(texture_img)
     print("Optimization started...")
@@ -194,16 +197,17 @@ def main():
 
     image_height, image_width = image.shape[:2]
     image_center = (image_width / 2, image_height / 2, 0)
-    radius = 50  # Adjusted to match rho_max
+    radius = 100  # Adjusted to match rho_max
     center = image_center
-    # rho_step_size = 5
-    # alpha_step_size = 2*np.pi / 10
+    rho_step_size = 10
+    alpha_step_size = (2*np.pi) / 10
 
-    control_points=np.loadtxt('./data/control_points.txt')
+    control_points=np.loadtxt('./data/control_points1.txt')
+    #control_points=generate_uniform_grid_control_points(rho_step_size,alpha_step_size,h_variable_range=(0,100), h_step_size=alpha_step_size/rho_step_size)
     control_points=control_points.reshape(11,11,3)
 
     points_2d_observed=detect_feature_points(image)
-
+    
     # z_vector = np.array([0, 0, 10])
     # z_unit_vector = z_vector / np.linalg.norm(z_vector)
     # x_camera_vector = np.array([1, 0, 0])
@@ -212,9 +216,9 @@ def main():
     # x_vector /= np.linalg.norm(x_vector)
     # y_vector /= np.linalg.norm(y_vector)
     # rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-    rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))*10
+    rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))
    
-    trans_mat = np.array([0.05373263359069820, 2.9846339225769000, 5.442359447479250])*10
+    trans_mat = np.array([0.05373263359069820, 2.9846339225769000, 5.442359447479250])
 
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)
     k = 2.5
