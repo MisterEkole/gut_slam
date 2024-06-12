@@ -75,9 +75,6 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
     points_2d_observed = points_2d_observed.reshape(-1, 2)
-
-    # print(f"Projected points shape: {projected_2d_pts.shape}")
-    # print(f"Observed points shape: {points_2d_observed.shape}")
     
     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
     photometric_error = []
@@ -117,6 +114,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
 
 
+
 def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, frame_idx):
     global optimization_errors
     optimization_errors = []
@@ -139,6 +137,8 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
     
     log_errors(optimization_errors, frame_idx)
     return result.x
+
+
 
 def log_errors(errors, frame_idx):
     folder_path = './logs'
@@ -184,9 +184,7 @@ def log_optim_params(optimized_params, frame_idx):
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/gut_images/Frames_S2000/0774.tif'
-    # texture_img='./tex/colon_DIFF.png'
-    # texture=pv.read_texture(texture_img)
+    image_path = '/Users/ekole/Dev/gut_slam/gut_images/Frames_S2000/0774.png'
     print("Optimization started...")
     start_time = time.time()
 
@@ -205,6 +203,7 @@ def main():
     control_points=np.loadtxt('./data/control_points1.txt')
     #control_points=generate_uniform_grid_control_points(rho_step_size,alpha_step_size,h_variable_range=(0,100), h_step_size=alpha_step_size/rho_step_size)
     control_points=control_points.reshape(11,11,3)
+    
 
     points_2d_observed=detect_feature_points(image)
     

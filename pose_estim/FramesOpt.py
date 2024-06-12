@@ -215,7 +215,7 @@ def main():
     k = 2.5
     g_t = 2.0
     gamma = 2.2
-    control_points=np.loadtxt('./data/control_points.txt')
+    control_points=np.loadtxt('./data/control_points1.txt')
     control_points=control_points.reshape(11,11,3)
     radius=50 #adjusted to match rho max
     # rho_step_size=5

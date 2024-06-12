@@ -650,7 +650,49 @@ class SingleWindowGridViz:
         modified_texture = pv.Texture(texture_array.reshape((height, width, -1)))
         plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
 
+# class GridViz3d:
+#     def __init__(self):
+#         self.vis = o3d.visualization.Visualizer()
+#         self.vis.create_window()
 
+#     def add_mesh_cartesian(self, points, texture_img=None):
+#         rho = points[:, 0]
+#         alpha = points[:, 1]
+#         h = points[:, 2]
+#         x, y, z = polar_to_cartesian(rho, alpha, h)
+#         points = np.vstack((x, y, z)).T
+#         scaler = StandardScaler()
+#         points = scaler.fit_transform(points)
+
+#         point_cloud = o3d.geometry.PointCloud()
+#         point_cloud.points = o3d.utility.Vector3dVector(points)
+#         self.vis.add_geometry(point_cloud)
+
+#     def add_mesh_polar(self, points, texture_img=None):
+#         scaler = StandardScaler()
+#         points = scaler.fit_transform(points)
+
+#         point_cloud = o3d.geometry.PointCloud()
+#         point_cloud.points = o3d.utility.Vector3dVector(points)
+#         self.vis.add_geometry(point_cloud)
+
+#     def add_mesh_cy(self, points, texture_img=None):
+#         rho = points[:, 0]
+#         alpha = points[:, 1]
+#         h = points[:, 2]
+#         x = rho * np.cos(alpha)
+#         y = rho * np.sin(alpha)
+#         points = np.vstack((x, y, h)).T
+#         scaler = StandardScaler()
+#         points = scaler.fit_transform(points)
+
+#         point_cloud = o3d.geometry.PointCloud()
+#         point_cloud.points = o3d.utility.Vector3dVector(points)
+#         self.vis.add_geometry(point_cloud)
+
+#     def __call__(self):
+#         self.vis.run()
+#         self.vis.destroy_window()
 '''loads a mesh file and plot it'''
 def load_and_plot_mesh(file_path, texture_img=None):
     mesh = pv.read(file_path)

@@ -14,6 +14,7 @@ import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
 import pyvista as pv
 from sklearn.preprocessing import StandardScaler
+import open3d as o3d
 
 def polar_to_cartesian(rho, alpha,h):
     x = rho * np.cos(alpha)
@@ -71,7 +72,7 @@ class GridViz:
             texture = pv.read_texture(texture_img)
             self.apply_texture_with_scalars(mesh, scalars=scalars, texture=texture)
         else:
-            self.plotter.add_points(points, color='green', point_size=5)
+            self.plotter.add_points(points, cmap='viridis', scalars=scalars, point_size=5, show_scalar_bar=False)
         self.plotter.add_axes(line_width=5, interactive=True)
 
         "Polar Coord Plots"
@@ -101,7 +102,6 @@ class GridViz:
         y=rho*np.sin(alpha)
         r=np.sqrt(x**2+y**2)
         theta=alpha
-        #r,theta,h=polar_to_cylindrical(rho,alpha,h)
         points = np.vstack((r, theta, h)).T
         scaler = StandardScaler()
         points = scaler.fit_transform(points)
@@ -207,7 +207,36 @@ class SingleWindowGridViz:
         plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
 
 # B-Spline Surface Generation
-class BMeshDeformation:
+
+''' B-mesh -with no interpolation of h--same h as cp'''
+class BMesh:
+    def __init__(self, radius, center):
+        self.radius = radius
+        self.center = center
+
+    def b_mesh_deformation(self,control_points):
+        M, N, _ = control_points.shape
+
+        rho = control_points[:, :, 0].flatten()
+        alpha = control_points[:, :, 1].flatten()
+        cp_h = control_points[:, :, 2].flatten()
+
+        spline_z = SmoothBivariateSpline(rho, alpha, cp_h, s=M * N)
+
+        pts = []
+        for i in range(M):
+            for j in range(N):
+                h = rho[i * N + j]
+                theta = alpha[i * N + j]
+                x = control_points[i, j, 0]
+                y = control_points[i, j, 1]
+                h=control_points[i,j,2]
+                pts.append([x, y, h])
+
+        return np.array(pts)
+    
+''' B-mesh with interpolation of h '''
+class BMeshDef:
     def __init__(self, radius, center):
         self.radius = radius
         self.center = center
@@ -232,13 +261,61 @@ class BMeshDeformation:
                 pts.append([x, y, h])
 
         return np.array(pts)
-''' dense splines'''
-class BMeshDeformationC:
+
+
+''' dense b mesh with same h as cp'''
+
+class BMeshDense:
     def __init__(self, radius, center):
         self.radius = radius
         self.center = center
 
-    def b_mesh_deformation(self, a, b, control_points, subsample_factor=2):
+    def b_mesh_deformation(self, control_points, subsample_factor=2):
+        M, N, _ = control_points.shape
+
+        rho = control_points[:, :, 0].flatten()
+        alpha = control_points[:, :, 1].flatten()
+        cp_h = control_points[:, :, 2].flatten()
+
+        spline_z = SmoothBivariateSpline(rho, alpha, cp_h, s=M * N)
+
+        pts = []
+        for i in range(M - 1):
+            for j in range(N - 1):
+                h1, h2 = control_points[i, j, 0], control_points[i + 1, j, 0]
+                theta1, theta2 = control_points[i, j, 1], control_points[i, j + 1, 1]
+                z1, z2 = control_points[i, j, 2], control_points[i + 1, j, 2]
+
+                for k in range(subsample_factor):
+                    for l in range(subsample_factor):
+                        frac_k = k / subsample_factor
+                        frac_l = l / subsample_factor
+
+                        new_h = h1 + frac_k * (h2 - h1)
+                        new_theta = theta1 + frac_l * (theta2 - theta1)
+                        # Take the height directly from control points without using spline evaluation
+                        new_z = z1 + frac_k * (z2 - z1)
+
+                        pts.append([new_h, new_theta, new_z])
+
+        # # Ensure edge points are included without subsampling
+        # for i in range(M):
+        #     for j in range(N):
+        #         if i == M - 1 or j == N - 1:
+        #             h = control_points[i, j, 0]
+        #             theta = control_points[i, j, 1]
+        #             z = control_points[i, j, 2]
+        #             pts.append([h, theta, z])
+
+        return np.array(pts)
+ 
+''' dense mesh with interpolated h'''
+class BMeshDefDense:
+    def __init__(self, radius, center):
+        self.radius = radius
+        self.center = center
+
+    def b_mesh_deformation(self, control_points, subsample_factor=2):
         M, N, _ = control_points.shape
 
         rho = control_points[:, :, 0].flatten()
@@ -263,18 +340,10 @@ class BMeshDeformationC:
 
                         new_h = h1 + frac_k * (h2 - h1)
                         new_theta = theta1 + frac_l * (theta2 - theta1)
-                        new_z = spline_z.ev(new_h, new_theta)
+                        new_z = spline_z.ev(new_h, new_theta)+np.random.randint(10,30)
 
                         pts.append([new_h, new_theta, new_z])
 
-     
-        for i in range(M):
-            for j in range(N):
-                if i == M - 1 or j == N - 1:
-                    h = control_points[i, j, 0]
-                    theta = control_points[i, j, 1]
-                    z = control_points[i, j, 2]
-                    pts.append([h, theta, z])
 
         return np.array(pts)
 
@@ -285,22 +354,22 @@ alpha_step_size = (2 * np.pi )/ 10  # Step size for alpha
 radius = 100
 center = (0, 0)
 
-#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_variable_range=(0,100),h_step_size=2*np.pi/100)
-control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
-control_points=control_points.reshape(11,11,3)
-#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=1)
+#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_variable_range=(0,100),h_step_size=(2*np.pi)/100)
+control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=1)
 
 
-bmd = BMeshDeformation(radius=radius, center=center)
-deformed_points = bmd.b_mesh_deformation(control_points=control_points)
+bmd = BMeshDefDense(radius=radius, center=center)
+deformed_points = bmd.b_mesh_deformation(control_points=control_points,subsample_factor=2)
 texture_img = './tex/colon_DIFF.png'
 
-viz = GridViz(grid_shape=(1, 3))
-viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
-viz.add_mesh_cy(deformed_points, subplot=(0, 1),texture_img=texture_img)
-viz.add_mesh_cartesian(deformed_points,subplot=(0,2),texture_img=texture_img)
-# viz.add_mesh_polar(deformed_points, subplot=(0, 0))
-# viz.add_mesh_cy(deformed_points, subplot=(0, 1))
-# viz.add_mesh_cartesian(deformed_points,subplot=(0,2))
+# viz = GridViz(grid_shape=(2, 3))
 
-viz()
+# viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
+# viz.add_mesh_cy(deformed_points, subplot=(0, 1),texture_img=texture_img)
+# viz.add_mesh_cartesian(deformed_points,subplot=(0,2),texture_img=texture_img)
+# viz.add_mesh_polar(deformed_points, subplot=(1, 0))
+# viz.add_mesh_cy(deformed_points, subplot=(1, 1))
+# viz.add_mesh_cartesian(deformed_points,subplot=(1,2))
+
+
+# viz()
