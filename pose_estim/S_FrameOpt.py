@@ -65,7 +65,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     image_height, image_width = image.shape[:2]
     center=(image_width/2,image_height/2,0)
 
-    points_3d=BMeshDeformation(radius=50,center=center)
+    points_3d=BMeshDef(radius=50,center=center)
     deformed_pts=points_3d.b_mesh_deformation(control_points)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
@@ -225,7 +225,7 @@ def main():
     gamma = 2.2
     init_lambda_ortho = 1
     init_lambda_det = 1
-    points_3d=BMeshDeformation(radius,center)
+    points_3d=BMeshDef(radius,center)
     points_3d=points_3d.b_mesh_deformation(control_points)
     
 

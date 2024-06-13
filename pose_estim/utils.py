@@ -362,8 +362,8 @@ def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_const
 ##=============================================================================
 
 
-''' B-Spline deformation control points only'''
-class BMeshDeformation:
+''' B-mesh with interpolation of h '''
+class BMeshDef:
     def __init__(self, radius, center):
         self.radius = radius
         self.center = center
@@ -388,16 +388,14 @@ class BMeshDeformation:
                 pts.append([x, y, h])
 
         return np.array(pts)
-    
-
-
-''' dense splines'''
-class BMeshDeformationD:
+ 
+''' dense mesh with interpolated h'''
+class BMeshDefDense:
     def __init__(self, radius, center):
         self.radius = radius
         self.center = center
 
-    def b_mesh_deformation(self, a, b, control_points, subsample_factor=2):
+    def b_mesh_deformation(self, control_points, subsample_factor=2):
         M, N, _ = control_points.shape
 
         rho = control_points[:, :, 0].flatten()
@@ -410,9 +408,8 @@ class BMeshDeformationD:
         for i in range(M - 1):
             for j in range(N - 1):
            
-                h1, h2 = control_points[i, j, 0], control_points[i + 1, j, 0]
-                theta1, theta2 = control_points[i, j, 1], control_points[i, j + 1, 1]
-                z1, z2 = control_points[i, j, 2], control_points[i + 1, j, 2]
+                rho1, rho2 = control_points[i, j, 0], control_points[i + 1, j, 0]
+                alpha1, alpha2 = control_points[i, j, 1], control_points[i, j + 1, 1]
 
                
                 for k in range(subsample_factor):
@@ -420,71 +417,15 @@ class BMeshDeformationD:
                         frac_k = k / subsample_factor
                         frac_l = l / subsample_factor
 
-                        new_h = h1 + frac_k * (h2 - h1)
-                        new_theta = theta1 + frac_l * (theta2 - theta1)
-                        new_z = spline_z.ev(new_h, new_theta)
+                        new_rho = rho1 + frac_k * (rho2 - rho1)
+                        new_alpha = alpha1 + frac_l * (alpha2 - alpha1)
+                        new_h = spline_z.ev(new_rho, new_alpha)
 
-                        pts.append([new_h, new_theta, new_z])
+                        pts.append([new_rho, new_alpha, new_h])
 
-     
-        for i in range(M):
-            for j in range(N):
-                if i == M - 1 or j == N - 1:
-                    h = control_points[i, j, 0]
-                    theta = control_points[i, j, 1]
-                    z = control_points[i, j, 2]
-                    pts.append([h, theta, z])
 
         return np.array(pts)
 
-    
-''' B-Spline Mesh deformation with control points and some prior cylinder points interpolation'''
-class BMeshDeformationC:
-    def __init__(self, height, center, cylinder_points):
-        self.height = height
-        self.center = center
-        self.cylinder_points = cylinder_points
-
-    def b_mesh_deformation(self, a, b, control_points):
-        M, N, _ = control_points.shape
-        heights = np.linspace(0, self.height, M)
-        angles = np.linspace(0, 2 * np.pi, N, endpoint=True)
-
-        heights, angles = np.meshgrid(heights, angles)
-        heights = heights.ravel()
-        angles = angles.ravel()
-      
-        cp_z = control_points[:, :, 2].ravel()
-
-     
-        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M * N)
-
-        pts = []
-        for point in self.cylinder_points:
-            h = point[2]
-            theta = np.arctan2(point[1] - self.center[1], point[0] - self.center[0]) % (2 * np.pi)
-
-            x = y = z = 0 
-            B_i = np.zeros(M)
-            B_j = np.zeros(N)
-
-            for i in range(M):
-                B_i[i] = (b / (2 * np.pi)) ** i * (1 - b / (2 * np.pi)) ** (M - i)
-                for j in range(N):
-                    B_j[j] = (a / np.max(a+b)) * (1 - a / np.max(a+b)) ** (N - j)
-                    
-                B_i /= np.linalg.norm(B_i, ord=2) 
-                B_j /= np.linalg.norm(B_j, ord=2) 
-                
-            for i in range(M):
-                for j in range(N):
-                    weight = B_i[i] * B_j[j]  
-                    x += weight * control_points[i, j, 0] 
-                    y += weight * control_points[i, j, 1] 
-                    z += weight * spline_z.ev(h, theta)
-            pts.append([x, y, z])  
-
-        return np.array(pts)
 ##=============================================================================
 ##=============================================================================
 ## Visualization Utils 
