@@ -77,8 +77,8 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     image_height, image_width = image.shape[:2]
     center=(image_width/2,image_height/2,0)
 
-    points_3d=BMeshDef(radius=50,center=center)
-    deformed_pts=points_3d.b_mesh_deformation(control_points)
+    points_3d=BMeshDefDense(radius=50,center=center)
+    deformed_pts=points_3d.b_mesh_deformation(control_points,subsample_factor=20)
   
     # Project points
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
@@ -236,8 +236,8 @@ def main():
 
        
         points_2d_observed = detect_feature_points(image)
-        points_3d=BMeshDef(radius,center)
-        points_3d=points_3d.b_mesh_deformation(control_points)
+        points_3d=BMeshDense(radius,center)
+        points_3d=points_3d.b_mesh_deformation(control_points,subsample_factor=20)
         
         if frame_idx in frame_data:
             trans_mat=frame_data[frame_idx]['translation']
