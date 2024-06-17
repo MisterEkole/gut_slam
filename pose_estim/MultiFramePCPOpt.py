@@ -77,8 +77,8 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     lambda_det = params[-1]
     image_height, image_width = image.shape[:2]
 
-    points_3d=BMeshDeformation(radius=50,center=(image_height/2,image_width/2,0))
-    deformed_pts=points_3d.b_mesh_deformation(control_points)
+    points_3d=BMeshDefDense(radius=50,center=(image_height/2,image_width/2,0))
+    deformed_pts=points_3d.b_mesh_deformation(control_points, subsample_factor=20)
     
  
     # Project points
@@ -181,7 +181,7 @@ def detect_feature_points(image):
     orb = cv2.ORB_create()
     kp=orb.detect(image,None)
     kp=cv2.KeyPoint_convert(kp)
-    return kp
+    return np.array(kp)
 
 def log_optim_params(optimized_params, frame_idx):
     folder_path = './logs'
@@ -204,11 +204,13 @@ def log_optim_params(optimized_params, frame_idx):
 
 ''' multiple frame optimisation with use of previous optim params'''
 def main():
-    frames_directory = '/Users/ekole/Synth_Col_Data/Frames_S2'
+    frames_directory = '/Users/ekole/Dev/gut_slam/gut_images/Frames_S2000'
+    frame_data=read_csv('/Users/ekole/Dev/gut_slam/gut_images/camera_poses_s2000.csv')
     print("Optimization started...")
     start_time = time.time()
 
     frames = load_frames_from_directory(frames_directory)
+    start_frame_idx=500
     total_optim_time = 0
 
     # Constants for optimization
@@ -218,7 +220,7 @@ def main():
     init_lambda_ortho, init_lambda_det = 1, 1
     control_points=np.loadtxt('./data/control_points.txt')
     control_points=control_points.reshape(11,11,3)
-    radius=50 #adjusted to match rho max
+    radius=100 #adjusted to match rho max
     # rho_step_size=5
     # alpha_step_size=2*np.pi/10
 
@@ -227,7 +229,7 @@ def main():
     optimized_params = None #<--- this line indicates that the optim params of the previous frame will be used for optim of susbsequent frame
 
 
-    for frame_idx, image in enumerate(frames):
+    for frame_idx, image in enumerate(frames[start_frame_idx:], start=start_frame_idx):
         print("Processing Frame:", frame_idx)
 
         if image is None:
@@ -236,22 +238,26 @@ def main():
 
         image_height, image_width = image.shape[:2]
         center=(image_width/2,image_height/2,0)
-        points_3d=BMeshDeformation(radius,center)
-        points_3d=points_3d.b_mesh_deformation(control_points)
+        points_3d=BMeshDefDense(radius,center)
+        points_3d=points_3d.b_mesh_deformation(control_points,subsample_factor=20)
      
       
         points_2d_observed = detect_feature_points(image)
 
-        #init cam pose
-        z_vector = np.array([0, 0, 10])
-        z_unit_vector = z_vector / np.linalg.norm(z_vector)
-        x_camera_vector = np.array([1, 0, 0])
-        y_vector = np.cross(z_unit_vector, x_camera_vector)
-        x_vector = np.cross(z_unit_vector, y_vector)
-        x_vector /= np.linalg.norm(x_vector)
-        y_vector /= np.linalg.norm(y_vector)
-        rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-        trans_mat = np.array([0, 0, 10])
+        if frame_idx in frame_data:
+            trans_mat=frame_data[frame_idx]['translation']
+            euler_angles=frame_data[frame_idx]['euler_angles']
+            rot_mat=euler_to_rotation_matrix(euler_angles)
+        else:
+            z_vector = np.array([0, 0, 10])
+            z_unit_vector = z_vector / np.linalg.norm(z_vector)
+            x_camera_vector = np.array([1, 0, 0])
+            y_vector = np.cross(z_unit_vector, x_camera_vector)
+            x_vector = np.cross(z_unit_vector, y_vector)
+            x_vector /= np.linalg.norm(x_vector)
+            y_vector /= np.linalg.norm(y_vector)
+            rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+            trans_mat = np.array([0, 0, 10])
 
     
         intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)

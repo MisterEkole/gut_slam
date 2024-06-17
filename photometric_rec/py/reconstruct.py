@@ -175,11 +175,14 @@ if __name__=='__main__':
     img=cv2.imread(args.image_path)
     image_output=args.output_dir
     pcl_output=args.pcl_output
+    k = 2.5
+    g_t = 2.0
+    gamma = 2.2
 
     for i in range(args.iters):
         depth_map=compute_img_depths(img, args.iters, args.downsample_factor, args.display_interval)
         #display_depth_map(depth_map, i, image_output)
-        #display_point_cloud(depth_map, pcl_output)
+        display_point_cloud(depth_map, pcl_output, k, g_t, gamma)
         break
     print("Reconstruction Complete!")
         

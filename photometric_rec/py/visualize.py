@@ -107,7 +107,7 @@ def compute_and_visualize_cylinder(point_cloud):
     o3d.visualization.draw_geometries([point_cloud, cylinder_mesh])
 if __name__ == "__main__":
     #file_path = '/Users/ekole/GutSLAM_Rec/image_output/pcl_FrameBuffer_0300.png/point_cloud_FrameBuffer_0300.png.txt'
-    file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud1.txt'
+    file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud.txt'
     #file_path='/Users/ekole/Dev/gut_slam/photometric_rec/py/pcl_output/point_cloud.txt'
 
     # Load original point cloud

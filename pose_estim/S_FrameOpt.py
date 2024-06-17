@@ -59,14 +59,14 @@ optimization_errors = []
 def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, b_mesh_deformation, lambda_ortho, lambda_det, pbar):
     rotation_matrix = params[:9].reshape(3, 3)
     translation_vector = params[9:12]
-    control_points = params[12:-2].reshape(11, 11, 3)
+    control_points = params[12:-2].reshape(20, 9, 3)
     lambda_ortho = params[-2]
     lambda_det = params[-1]
     image_height, image_width = image.shape[:2]
     center=(image_width/2,image_height/2,0)
 
-    points_3d=BMeshDeformation(radius=50,center=center)
-    deformed_pts=points_3d.b_mesh_deformation(control_points)
+    points_3d=BMeshDense(radius=50,center=center)
+    deformed_pts=points_3d.b_mesh_deformation(control_points,subsample_factor=5)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     projected_2d_pts = projector.project_points(deformed_pts)
@@ -114,6 +114,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
 
 
+
 def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, initial_params, k, g_t, gamma, frame_idx):
     global optimization_errors
     optimization_errors = []
@@ -136,6 +137,8 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
     
     log_errors(optimization_errors, frame_idx)
     return result.x
+
+
 
 def log_errors(errors, frame_idx):
     folder_path = './logs'
@@ -162,7 +165,7 @@ def detect_feature_points(image):
     orb = cv2.ORB_create()
     kp = orb.detect(image, None)
     kp = cv2.KeyPoint_convert(kp)
-    return kp
+    return np.array(kp)
 
 def log_optim_params(optimized_params, frame_idx):
     folder_path = './logs'
@@ -181,9 +184,7 @@ def log_optim_params(optimized_params, frame_idx):
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 def main():
-    image_path = './rendering/mesh.png'
-    # texture_img='./tex/colon_DIFF.png'
-    # texture=pv.read_texture(texture_img)
+    image_path = '/Users/ekole/Dev/gut_slam/pose_estim/rendering/cartesian_mesh.png'
     print("Optimization started...")
     start_time = time.time()
 
@@ -194,16 +195,19 @@ def main():
 
     image_height, image_width = image.shape[:2]
     image_center = (image_width / 2, image_height / 2, 0)
-    radius = 50  # Adjusted to match rho_max
+    radius = 100  
     center = image_center
-    # rho_step_size = 5
-    # alpha_step_size = 2*np.pi / 10
+    rho_step_size = 0.1
+    alpha_step_size = np.pi/ 4
 
-    control_points=np.loadtxt('./data/control_points.txt')
-    control_points=control_points.reshape(11,11,3)
+    # control_points=np.loadtxt('./data/control_points1.txt')
+    control_points=generate_uniform_grid_control_points(rho_step_size, alpha_step_size,R=100)
+   
+    # control_points=control_points.reshape(11,11,3)
+    
 
     points_2d_observed=detect_feature_points(image)
-
+    
     z_vector = np.array([0, 0, 10])
     z_unit_vector = z_vector / np.linalg.norm(z_vector)
     x_camera_vector = np.array([1, 0, 0])
@@ -212,8 +216,9 @@ def main():
     x_vector /= np.linalg.norm(x_vector)
     y_vector /= np.linalg.norm(y_vector)
     rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+    #rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))
    
-    trans_mat = np.array([0, 0, 10])
+    trans_mat = np.array([-0.05033538430028072, -0.07541576289068641, 2.572986058541503])
 
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)
     k = 2.5
@@ -221,8 +226,8 @@ def main():
     gamma = 2.2
     init_lambda_ortho = 1
     init_lambda_det = 1
-    points_3d=BMeshDeformation(radius,center)
-    points_3d=points_3d.b_mesh_deformation(control_points)
+    points_3d=BMeshDense(radius,center)
+    points_3d=points_3d.b_mesh_deformation(control_points,subsample_factor=5)
     
 
     initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(),control_points.ravel(),init_lambda_ortho, init_lambda_det])
