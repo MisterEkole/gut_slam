@@ -1,3 +1,4 @@
+''' This script determines the step size for rho based on the desired number of steps.'''
 import numpy as np
 
 def determine_rho_step_size(rho_range, desired_steps):

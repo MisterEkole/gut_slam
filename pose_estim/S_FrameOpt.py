@@ -208,17 +208,17 @@ def main():
 
     points_2d_observed=detect_feature_points(image)
     
-    # z_vector = np.array([0, 0, 10])
-    # z_unit_vector = z_vector / np.linalg.norm(z_vector)
-    # x_camera_vector = np.array([1, 0, 0])
-    # y_vector = np.cross(z_unit_vector, x_camera_vector)
-    # x_vector = (np.cross(z_unit_vector, y_vector))
-    # x_vector /= np.linalg.norm(x_vector)
-    # y_vector /= np.linalg.norm(y_vector)
-    # rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-    rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))
+    z_vector = np.array([0, 0, 10])
+    z_unit_vector = z_vector / np.linalg.norm(z_vector)
+    x_camera_vector = np.array([1, 0, 0])
+    y_vector = np.cross(z_unit_vector, x_camera_vector)
+    x_vector = (np.cross(z_unit_vector, y_vector))
+    x_vector /= np.linalg.norm(x_vector)
+    y_vector /= np.linalg.norm(y_vector)
+    rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+    #rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))
    
-    trans_mat = np.array([-0.5344824684211659, 0.25766926339767526, 6.6513925947047925])
+    trans_mat = np.array([-0.05033538430028072, -0.07541576289068641, 2.572986058541503])
 
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)
     k = 2.5

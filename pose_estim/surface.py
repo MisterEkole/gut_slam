@@ -25,7 +25,7 @@ alpha_step_size = np.pi/4  # Step size for alpha
 radius = 100
 center = (0, 0)
 
-# control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size,R=100)
+#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size,R=100)
 # # print(control_points.shape)
 control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
 control_points=control_points.reshape(20,9,3)
@@ -39,6 +39,7 @@ texture_img = './tex/stomach_DIFF.png'
 # viz = GridViz(grid_shape=(2, 3))
 viz=SingleWindowGridViz()
 
+
 # viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
 # viz.add_mesh_cy(deformed_points, subplot=(0, 1),texture_img=texture_img)
 # viz.add_mesh_cartesian(deformed_points,subplot=(0,2),texture_img=texture_img)
@@ -46,7 +47,9 @@ viz=SingleWindowGridViz()
 # viz.add_mesh_cy(deformed_points, subplot=(1, 1))
 # viz.add_mesh_cartesian(deformed_points,subplot=(1,2))
 
-camera_info_cartesian=viz.visualize_and_save_cartesian(deformed_points, './rendering/cartesian_mesh.vtk', screenshot='./rendering/cartesian_mesh.png',texture_img=texture_img)
+camera_info_cartesian=viz.visualize_and_save_cartesian(deformed_points, './rendering/cartesian_mesh.vtk', screenshot=None,texture_img=texture_img)
 viz.save_camera_info_to_file(camera_info_cartesian, './data/cartesian_camera_info.txt')
+
+
 
 # viz()

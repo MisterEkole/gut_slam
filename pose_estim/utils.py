@@ -20,139 +20,6 @@ import matplotlib.image as mpimg
 import cv2
 from sklearn.preprocessing import StandardScaler
 import csv
-class WarpField:
-    """
-    Initialize the WarpField class with cylinder parameters.
-    
-    Parameters:
-    - radius: The radius of the base of the cylinder.
-    - height: The height of the cylinder.
-    - vanishing_point: A tuple (x, y, z) representing the vanishing point which influences the cylinder's orientation.
-    - center: A tuple (x, y, z) representing the center of the base of the cylinder.
-    - resolution: The number of points around the circumference of the cylinder.
-    """
-    def __init__(self, radius, height, vanishing_pts, center=(0,0,0), resolution=100):
-        self.radius = radius
-        self.height = height
-        self.center = np.array(center)
-        self.resolution = resolution
-        self.vanishing_pts = np.array(vanishing_pts)
-        self.cylinder = self.create_cylinder()
-
-    def create_cylinder(self):
-        'Generate cylindrical mesh considering vp and center'
-        direction = self.vanishing_pts - self.center
-        cylinder = pv.Cylinder(radius=self.radius, height=self.height, direction=direction, center=self.center, resolution=self.resolution)
-        return cylinder
-
-    def apply_deformation_axis(self, strength=0.1, frequency=1):
-        'Apply non-rigid deformation to the cylinder mesh'
-        points = self.cylinder.points
-        points[:, 0] += strength * np.sin(frequency * points[:, 0])
-        points[:, 1] += strength * np.cos(frequency * points[:, 1])
-        points[:, 2] += strength * np.sin(frequency * points[:, 2])
-        self.cylinder.points = points
-
-    def apply_deformation(self, strength=0.1, frequency=1):
-        points = self.cylinder.points
-        x, y, z = points[:, 0], points[:, 1], points[:, 2]
-        r = np.sqrt(x**2 + y**2)
-        phi = np.arctan2(y, x)
-        twist_phi = phi + strength * np.sin(frequency * z)
-        points[:, 0] = r * np.cos(twist_phi)
-        points[:, 1] = r * np.sin(twist_phi)
-        self.cylinder.points = points
-
-    def apply_shrinking(self, start_radius=None, end_radius=None):
-        if start_radius is None:
-            start_radius = self.radius
-        if end_radius is None:
-            end_radius = self.radius * 0.9
-        points = self.cylinder.points
-        z = points[:, 2]
-        z_normalized = (z - z.min()) / (z.max() - z.min())
-        new_radii = start_radius * (1 - z_normalized) + end_radius * z_normalized
-        r = np.sqrt(points[:, 0]**2 + points[:, 1]**2)
-        phi = np.arctan2(points[:, 1], points[:, 0])
-        r_shrunk = r / r.max() * new_radii
-        points[:, 0] = r_shrunk * np.cos(phi)
-        points[:, 1] = r_shrunk * np.sin(phi)
-        self.cylinder.points = points
-
-    def extract_pts(self):
-        pcd = self.cylinder.points
-        return pcd
-
-    def save_pts(self, filename):
-        points = self.extract_pts()
-        np.savetxt(filename, points, delimiter=',')
-
-    def densify_pts(self, target_count):
-        points = self.extract_pts()
-        current_count = len(points)
-        factor = np.ceil(target_count / current_count).astype(int)
-        densified_points = np.empty((0, 3), dtype=np.float64)
-        for point in points:
-            repeated_points = np.tile(point, (factor, 1))
-            densified_points = np.vstack((densified_points, repeated_points))
-        self.cylinder.points = densified_points[:target_count]
-
-   
-    def b_mesh_deformation(self, a, b, control_points):
-        M, N, _ = control_points.shape
-        heights = np.linspace(0, self.height, M)
-        angles = np.linspace(0, 2 * np.pi, N, endpoint=True)
-
-        heights, angles = np.meshgrid(heights, angles)
-        heights = heights.ravel()
-        angles = angles.ravel()
-        cp_x = control_points[:, :, 0].ravel()
-        cp_y = control_points[:, :, 1].ravel()
-        cp_z = control_points[:, :, 2].ravel()
-   
-        spline_x = SmoothBivariateSpline(heights, angles, cp_x, s=M*N)
-        spline_y = SmoothBivariateSpline(heights, angles, cp_y, s=M*N)
-        spline_z = SmoothBivariateSpline(heights, angles, cp_z, s=M*N)
-  
-        pts = []
-        for point in self.cylinder.points:
-            h = point[2]
-            theta = np.arctan2(point[1] - self.center[1], point[0] - self.center[0]) % (2 * np.pi)
-        
-            x = y = z = 0 
-            B_i = np.zeros(M)
-            B_j = np.zeros(N)
-
-            for i in range(M):
-                B_i[i] = (b / (2 * np.pi)) ** i * (1 - b / (2 * np.pi)) ** (M - i)
-               
-               
-                for j in range(N):
-                    B_j[j] = (a / np.max(a+b)) * (1 - a / np.max(a+b)) ** (N - j)
-    
-                B_i /= np.linalg.norm(B_i, ord=2) 
-                B_j /= np.linalg.norm(B_j, ord=2) 
-      
-            for i in range(M):
-                for j in range(N):
-                    weight = B_i[i] * B_j[j]  
-
-               
-                    x += weight * spline_x.ev(h, theta)
-                    y += weight * spline_y.ev(h, theta)
-                    z += weight * spline_z.ev(h, theta)
-
-            pts.append([x, y, z])  
-
-        self.cylinder.points = np.array(pts)  
-    def get_mesh_pts(self):
-        return self.cylinder.points.copy()
-    def extract_mesh_pts(self):
-        return self.get_mesh_pts()
-
-
-
-
 
 class Project3D_2D_cam:
     def __init__(self, intrinsic_matrix, rotation_matrix, translation_vector):
@@ -351,7 +218,7 @@ def generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_const
 ##=============================================================================
 
 
-''' B-spline-mesh with  no interpolation of h '''
+''' Sparse B-spline-mesh with interpolation of h'''
 class BMesh:
     def __init__(self, radius, center):
         self.radius = radius
@@ -378,7 +245,7 @@ class BMesh:
 
         return np.array(pts)
  
-''' dense b-spline mesh with interpolated h'''
+''' Dense b-spline mesh with interpolated h'''
 class BMeshDense:
     def __init__(self, radius, center):
         self.radius = radius
@@ -417,7 +284,7 @@ class BMeshDense:
 
 
 
-''' dense b_mesh with bending, twisting and random disturbances deformations'''
+''' Dense b_mesh with bending, twisting and random disturbances deformations'''
 class BMeshDefDense:
     def __init__(self, radius, center):
         self.radius = radius
@@ -622,7 +489,7 @@ class GridViz:
     def __call__(self):
         self.plotter.show()
 
-''' Vizualise mesh in a single window with camera, save mesh,render image and save cam pose info'''
+''' renders a mesh in cartesian, polar and cylindrical coordinates in a single window, saves camera info to file and mesh to file'''
 
 class SingleWindowGridViz:
     def __init__(self):
@@ -759,101 +626,123 @@ class SingleWindowGridViz:
             file.write(f"Focal Point: {camera_settings['focal_point']}\n")
             file.write(f"View Up: {camera_settings['view_up']}\n")
 
+''' loads a vtk mesh file an visualises in appropriate coordinate system'''
 
+class MeshPlotter:
+    def __init__(self):
+        self.plotter = pv.Plotter()
 
-'''loads a mesh file and plot it---- to be modified'''
-def load_and_plot_mesh(file_path, texture_img=None):
-    mesh = pv.read(file_path)
-    scaler = StandardScaler()
-    mesh.points = scaler.fit_transform(mesh.points)
-    mesh = mesh.delaunay_2d()
-    mesh = mesh.smooth(n_iter=600)
-    
-    # Extract and normalize z-values
-    z_values = mesh.points[:, 2]
-    z_min, z_max = z_values.min(), z_values.max()
-    z_normalized = (z_values - z_min) / (z_max - z_min)
-    
-    # Generate colors based on height variation
-    base_color = np.array([1.0, 0.5, 0.5])  # Pinkish-red
-    intensity_variation = np.random.uniform(0.8, 1.2, mesh.n_points).reshape(-1, 1)
-    height_based_variation = (z_normalized * 0.5 + 0.5).reshape(-1, 1)
-    colors = base_color * intensity_variation * height_based_variation
-    colors = np.clip(colors, 0, 1)
-    mesh.point_data['colors'] = colors
-    
-    # Plot mesh
-    plotter = pv.Plotter()
-    
-    if texture_img is not None:
-        # Apply texture
-        mesh.texture_map_to_plane(inplace=True)
+    def visualize_cartesian(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None):
+        mesh = pv.read(mesh_file)
+        mesh.points = self.standard_scale(mesh.points)
+        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, coordinate_system='cartesian')
+        return camera_settings
+
+    def visualize_polar(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None):
+        mesh = pv.read(mesh_file)
+        mesh.points = self.standard_scale(mesh.points)
+        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, coordinate_system='polar')
+        return camera_settings
+
+    def visualize_cylindrical(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None):
+        mesh = pv.read(mesh_file)
+        rho = mesh.points[:, 0]
+        alpha = mesh.points[:, 1]
+        h = mesh.points[:, 2]
+        x = rho * np.cos(alpha)
+        y = rho * np.sin(alpha)
+        mesh.points = np.vstack((x, y, h)).T
+        mesh.points = self.standard_scale(mesh.points)
+        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, coordinate_system='cylindrical')
+        return camera_settings
+
+    def standard_scale(self, points):
+        scaler = StandardScaler()
+        return scaler.fit_transform(points)
+
+    def visualize_mesh(self, mesh, screenshot, texture_img, cmap, coordinate_system):
+        scalars = mesh.points[:, 2]
+
+        if texture_img:
+            if coordinate_system == 'cartesian':
+                rho, alpha, h = self.extract_polar_coordinates(mesh.points)
+            else:
+                rho, alpha, h = None, None, None
+            self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
+        else:
+            self.apply_color_texture_with_scalars(mesh, scalars, cmap)
+
+        self.plotter.add_mesh(mesh, show_edges=False, show_scalar_bar=False)
+        self.set_camera()
+        self.plotter.show(screenshot=screenshot)
+
+        camera_settings = {
+            "position": self.plotter.camera.position,
+            "focal_point": self.plotter.camera.focal_point,
+            "view_up": self.plotter.camera.view_up
+        }
+
+        return camera_settings
+
+    def apply_texture_with_geometry(self, mesh, texture_img, rho, alpha, h):
         texture = pv.read_texture(texture_img)
-        
-        # Create and modify texture based on scalars
         texture_image = texture.to_image()
-        width, height, _ = texture_image.dimensions
+        width, height = texture_image.dimensions[:2]
         texture_array = texture_image.point_data.active_scalars.reshape((height, width, -1))
-        
-        normalized_scalars = (z_values - z_values.min()) / (z_values.max() - z_values.min())
-        if mesh.active_texture_coordinates is None or len(mesh.active_texture_coordinates) == 0:
-            mesh.texture_map_to_plane(inplace=True)
-        
-        texture_coordinates = mesh.active_texture_coordinates
-        for i, (u, v) in enumerate(texture_coordinates):
+        scalars = mesh.points[:, 2]
+        normalized_scalars = (scalars - scalars.min()) / (scalars.max() - scalars.min())
+
+        if rho is not None and alpha is not None:
+            u = (alpha - alpha.min()) / (alpha.max() - alpha.min())
+            v = (h - h.min()) / (h.max() - h.min())
+        else:
+            u, v = mesh.active_texture_coordinates.T
+
+        texture_coords = np.c_[u, v]
+        mesh.active_texture_coordinates = texture_coords
+
+        for I, (u, v) in enumerate(texture_coords):
             x = int(u * (width - 1))
             y = int(v * (height - 1))
             x = np.clip(x, 0, width - 1)
             y = np.clip(y, 0, height - 1)
-            factor = normalized_scalars[i]
+            factor = normalized_scalars[I]
             texture_array[y, x] = texture_array[y, x] * factor
-        
-        texture_array = np.clip(texture_array, 0, 255).astype(np.uint8)
-        modified_texture = pv.Texture(texture_array.reshape((height, width, -1)))
-        
-        plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
-    else:
-        # Apply colors
-        plotter.add_mesh(mesh, scalars='colors', rgb=True, show_edges=False, show_scalar_bar=False)
-    
-    plotter.set_background("white")
-    plotter.show()
 
+        modified_texture = pv.numpy_to_texture(texture_array)
+        self.plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
 
+    def apply_color_texture_with_scalars(self, mesh, scalars, cmap):
+        z_range = scalars.max() - scalars.min()
+        if z_range == 0:
+            z_normalized = np.ones_like(scalars)
+        else:
+            z_normalized = (scalars - scalars.min()) / z_range
 
-##=============================================================================
-##=============================================================================
-## Function to Compute a & b constant params for B-spline from the given image
-##=============================================================================
-##=============================================================================
+        colormap = plt.get_cmap(cmap)
+        colors = colormap(z_normalized)[:, :3]
+        mesh.point_data['colors'] = colors
+        self.plotter.add_mesh(mesh, scalars='colors', rgb=True, show_edges=False, show_scalar_bar=False)
 
-def compute_a_b_values(image_path):
-   
-    image = cv2.imread(image_path)
-    if image is None:
-        print("Error: Image not found.")
-        return None, None
-    image_height, image_width = image.shape[:2]
-    image_center = (image_width / 2, image_height / 2, 0)
-    
-    vanishing_pts = (0, 0, 10)
-   
-    a_values = np.zeros((image_height, image_width, 3), dtype=np.float32)
-    b_values = np.zeros((image_height, image_width), dtype=np.float32)
+    def extract_polar_coordinates(self, points):
+        x, y, z = points[:, 0], points[:, 1], points[:, 2]
+        rho = np.sqrt(x ** 2 + y ** 2)
+        alpha = np.arctan2(y, x)
+        return rho, alpha, z
 
-    for row in range(image_height):
-        for col in range(image_width):
-            p_minus_vp = np.array([col, row, 0]) - np.array(vanishing_pts) 
-            a_values[row, col] = p_minus_vp
-            b_values[row, col] = np.arctan2(p_minus_vp[1], p_minus_vp[0])
+    def set_camera(self):
+        camera_position = (10, 10, 10)
+        focal_point = (0, 0, 0)
+        view_up = (0, 0, 1)
+        self.plotter.camera.position = camera_position
+        self.plotter.camera.focal_point = focal_point
+        self.plotter.camera.view_up = view_up
 
-   
-    a_values = a_values / np.linalg.norm(a_values, axis=(0, 1))
-    a_values=np.mean(a_values.ravel())
-    b_values = b_values / np.linalg.norm(b_values)
-    b_values=np.mean(b_values.ravel())
-
-    return a_values, b_values
+    def save_camera_info_to_file(self, camera_settings, filename):
+        with open(filename, 'w') as file:
+            file.write(f"Camera Position: {camera_settings['position']}\n")
+            file.write(f"Focal Point: {camera_settings['focal_point']}\n")
+            file.write(f"View Up: {camera_settings['view_up']}\n")
 
 
 ''' Objective function with texture info'''

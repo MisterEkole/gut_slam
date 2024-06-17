@@ -1,3 +1,5 @@
+''' This script converts all TIFF files in a folder to PNG files.'''
+
 import os
 from PIL import Image
 

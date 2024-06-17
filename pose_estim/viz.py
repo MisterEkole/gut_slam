@@ -167,9 +167,10 @@ def calculate_rotation_matrix(position, focal_point, view_up):
 
 
 def main():
-    image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/mesh9.png'
+    image_path='/Users/ekole/Dev/gut_slam/pose_estim/rendering/cartesian_mesh.png'
     image = cv2.imread(image_path)
     texture_img = './tex/colon_DIFF.png'
+    m_plotter=MeshPlotter()
 
     if image is None:
         print("Error: Image not found.")
@@ -208,15 +209,16 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    mesh_pts, mesh_edges=read_vtk_file('./rendering/mesh9.ply')
+    #mesh_pts, mesh_edges=read_vtk_file('./rendering/cartesian_mesh.vtk')
 
-    projected_pts=projector.project_points(points_3d=mesh_pts)
-    projected_pts=scale_projected_points(projected_pts, image_width, image_height)
+    # projected_pts=projector.project_points(points_3d=mesh_pts)
+    # projected_pts=scale_projected_points(projected_pts, image_width, image_height)
   
     # plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
     # plot_on_image(image_path, projected_pts)
     #load_and_plot_mesh('./rendering/textured_gut_mesh.ply')
-    load_and_plot_mesh('./rendering/mesh1.vtk',texture_img=texture_img)
+    m_plotter.visualize_cartesian('./rendering/def_mesh.vtk', texture_img)
+    
 if __name__ == "__main__":
     main()
 
