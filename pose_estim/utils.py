@@ -320,11 +320,19 @@ class BMeshDefDense:
         Apply random disturbances to the height (z-coordinate) of the points.
         """
         disturbed_points = np.copy(points)
-        disturbances = np.random.uniform(-disturbance_amplitude, disturbance_amplitude, size=disturbed_points.shape[0])
-        disturbed_points[:, 2] += disturbances
+        disturbances = np.random.uniform(-disturbance_amplitude, disturbance_amplitude, size=disturbed_points.shape)
+        disturbed_points+= disturbances
+        return disturbed_points
+    
+    def apply_sinusoidal_disturbances(self, points, amplitude, frequency):
+        disturbed_points = np.copy(points)
+        for i in range(disturbed_points.shape[0]):
+            disturbed_points[i, 0] += amplitude * np.sin(frequency * points[i, 0])  # Sinusoidal disturbance on rho
+            disturbed_points[i, 1] += amplitude * np.sin(frequency * points[i, 1])  # Sinusoidal disturbance on alpha
+            disturbed_points[i, 2] += amplitude * np.sin(frequency * points[i, 2])  # Sinusoidal disturbance on z
         return disturbed_points
 
-    def b_mesh_deformation(self, control_points, subsample_factor=2, disturbance_amplitude=3, bend_amplitude=5.0,bend_frequency=0.5):
+    def b_mesh_deformation(self, control_points, subsample_factor=2, disturbance_amplitude=None, bend_amplitude=None,bend_frequency=None):
         M, N, _ = control_points.shape
 
         rho = control_points[:, :, 0].flatten()
@@ -351,8 +359,9 @@ class BMeshDefDense:
                         pts.append([new_rho, new_alpha, new_h])
 
         pts = np.array(pts)
-        pts=self.bend_deformation(pts, bend_amplitude, bend_frequency)
-        #pts=self.apply_random_disturbances(pts,disturbance_amplitude=4.0)
+        #pts=self.bend_deformation(pts, bend_amplitude, bend_frequency)
+        pts=self.apply_random_disturbances(pts,disturbance_amplitude=4.0)
+        #pts=self.apply_sinusoidal_disturbances(pts, amplitude=10.0, frequency=2.0)
         #pts=self.twist_deformation(pts,twist_rate=1.0)
 
         return pts
@@ -367,7 +376,7 @@ class GridViz:
     def __init__(self, grid_shape, window_size=(2300, 1500)):
         self.plotter = pv.Plotter(shape=grid_shape, window_size=window_size)
 
-    def add_mesh_cartesian(self, points, subplot, texture_img=None, cmap='YlOrRd'): #pale flesh tone color
+    def add_mesh_cartesian(self, points, subplot, texture_img=None, cmap='YlOrRd',label=None): #pale flesh tone color
         rho = points[:, 0]
         alpha = points[:, 1]
         h = points[:, 2]
@@ -386,13 +395,16 @@ class GridViz:
         scalars = mesh.points[:, 2]
         self.plotter.subplot(*subplot)
         if texture_img is not None:
-            #self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
-            self.apply_color_texture_with_geometry(mesh,cmap)
+            self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
+            #self.apply_color_texture_with_geometry(mesh,cmap)
         else:
             self.plotter.add_points(points, cmap='viridis', scalars=scalars, point_size=5, show_scalar_bar=False)
+            #self.plotter.add_points(mesh.points, cmap='viridis',show_scalar_bar=False,scalars=scalars, point_size=5)
         self.plotter.add_axes(line_width=5, interactive=True)
+        if label:
+            self.plotter.add_text(label, position='upper_left')
 
-    def add_mesh_polar(self, points, subplot, texture_img=None,cmap='YlOrRd'):
+    def add_mesh_polar(self, points, subplot, texture_img=None,cmap='YlOrRd',label=None):
         scaler = StandardScaler()
         points = scaler.fit_transform(points)
         cloud = pv.PolyData(points)
@@ -402,13 +414,16 @@ class GridViz:
         self.plotter.subplot(*subplot)
         if texture_img is not None:
             rho, alpha, h = self.extract_polar_coordinates(points)
-            #self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
-            self.apply_color_texture_with_geometry(mesh,cmap)
+            self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
+            #self.apply_color_texture_with_geometry(mesh,cmap)
         else:
-            self.plotter.add_points(points, color='green', point_size=5)
+            #self.plotter.add_points(mesh.points, cmap='viridis',show_scalar_bar=False,scalars=scalars, point_size=5)
+            self.plotter.add_points(points, cmap='viridis',show_scalar_bar=False,scalars=scalars, point_size=5)
         self.plotter.add_axes(interactive=True, xlabel='rho', ylabel='alpha', zlabel='h', line_width=5)
+        if label:
+            self.plotter.add_text(label, position='upper_left')
 
-    def add_mesh_cy(self, points, subplot, texture_img=None,cmap='YlOrRd'):
+    def add_mesh_cy(self, points, subplot, texture_img=None,cmap='YlOrRd',label=None):
         rho = points[:, 0]
         alpha = points[:, 1]
         h = points[:, 2]
@@ -425,11 +440,14 @@ class GridViz:
         scalars = mesh.points[:, 2]
         self.plotter.subplot(*subplot)
         if texture_img is not None:
-            #self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
-            self.apply_color_texture_with_geometry(mesh,cmap)
+            self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
+            #self.apply_color_texture_with_geometry(mesh,cmap)
         else:
-            self.plotter.add_points(points, color='green', point_size=5)
+            self.plotter.add_points(mesh.points, cmap='viridis',show_scalar_bar=False,scalars=scalars, point_size=5)
+            #self.plotter.add_points(points, cmap='viridis',show_scalar_bar=False,scalars=scalars, point_size=5)
         self.plotter.add_axes(interactive=True, xlabel='r', ylabel='theta', zlabel='h', line_width=5)
+        if label:
+            self.plotter.add_text(label, position='upper_left')
 
     def apply_texture_with_geometry(self, mesh, texture_img, rho, alpha, h):
         texture = pv.read_texture(texture_img)
@@ -459,13 +477,6 @@ class GridViz:
         modified_texture = pv.numpy_to_texture(texture_array)
         self.plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
 
-    # def apply_color_texture_with_geometry(self, mesh,color_base):
-    #     z=mesh.points[:,2]
-    #     z_normalised=(z-z.min())/(z-z.max()+10e-6)
-    #     colors=np.array([color_base*brightness for brightness in z_normalised])
-    #     mesh.point_data['colors']=colors
-    #     self.plotter.add_mesh(mesh, scalars='colors',rgb=True,show_edges=False, show_scalar_bar=False)
-
     def apply_color_texture_with_geometry(self, mesh, cmap):
         z = mesh.points[:, 2]
         z_range = z.max() - z.min()
@@ -485,17 +496,24 @@ class GridViz:
         rho = np.sqrt(x**2 + y**2)
         alpha = np.arctan2(y, x)
         return rho, alpha, z
-
-    def __call__(self):
+    
+    def save_plot(self, filename):
+        self.plotter.screenshot(filename)
+    
+    def show(self):
         self.plotter.show()
+
+
+
+
 
 ''' renders a mesh in cartesian, polar and cylindrical coordinates in a single window, saves camera info to file and mesh to file'''
 
 class SingleWindowGridViz:
     def __init__(self):
-        self.plotter = pv.Plotter()
+        pass  # Removed plotter initialization from here
 
-    def visualize_and_save_cartesian(self, points, filename, screenshot=None, texture_img=None, cmap='YlOrRd'):
+    def visualize_and_save_cartesian(self, points, filename, screenshot=None, texture_img=None, cmap='YlOrRd', wireframe=False):
         rho = points[:, 0]
         alpha = points[:, 1]
         h = points[:, 2]
@@ -503,26 +521,27 @@ class SingleWindowGridViz:
         points = np.vstack((x, y, z)).T
         points = self.standard_scale(points)
         mesh = self.create_structured_grid(points)
-        camera_settings=self.visualize_mesh(mesh, filename, screenshot, texture_img, cmap, coordinate_system='cartesian')
+        camera_settings = self.visualize_mesh(mesh, filename, screenshot, texture_img, 'cartesian', wireframe)
         return camera_settings
 
-    def visualize_and_save_polar(self, points, filename, screenshot=None, texture_img=None, cmap='YlOrRd'):
+    def visualize_and_save_polar(self, points, filename, screenshot=None, texture_img=None, cmap='YlOrRd', wireframe=False):
         points = self.standard_scale(points)
         mesh = self.create_delaunay_mesh(points)
-        camera_settings=self.visualize_mesh(mesh, filename, screenshot, texture_img, cmap, coordinate_system='polar')
+        camera_settings = self.visualize_mesh(mesh, filename, screenshot, texture_img, 'polar', wireframe)
         return camera_settings
 
-    def visualize_and_save_cylindrical(self, points, filename, screenshot=None, texture_img=None, cmap='YlOrRd'):
+    def visualize_and_save_cylindrical(self, points, filename, screenshot=None, texture_img=None, cmap='YlOrRd', wireframe=False):
         rho = points[:, 0]
         alpha = points[:, 1]
         h = points[:, 2]
         x = rho * np.cos(alpha)
         y = rho * np.sin(alpha)
-        points = np.vstack((x, y, h)).T
+        r = np.sqrt(x**2 + y**2)
+        theta = alpha
+        points = np.vstack((r, theta, h)).T
         points = self.standard_scale(points)
         mesh = self.create_delaunay_mesh(points)
-        camera_settings=self.visualize_mesh(mesh, filename, screenshot, texture_img, cmap, coordinate_system='cylindrical')
-        
+        camera_settings = self.visualize_mesh(mesh, filename, screenshot, texture_img, 'cylindrical', wireframe)
         return camera_settings
 
     def standard_scale(self, points):
@@ -542,32 +561,40 @@ class SingleWindowGridViz:
         mesh = cloud.delaunay_2d()
         return mesh.smooth(n_iter=500)
 
-    def visualize_mesh(self, mesh, filename, screenshot, texture_img, cmap, coordinate_system):
+    def visualize_mesh(self, mesh, filename, screenshot, texture_img, cmap, coordinate_system, wireframe=False):
+        plotter = pv.Plotter()  # Create a new plotter instance for each visualization
         scalars = mesh.points[:, 2]
 
         if texture_img:
             if coordinate_system == 'cartesian':
                 rho, alpha, h = self.extract_polar_coordinates(mesh.points)
+            elif coordinate_system == 'cylindrical':
+                rho, alpha, h = self.extract_cylindrical_coordinates(mesh.points)
             else:
-                rho, alpha, h = None, None, None
-            self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
-        else:
-            self.apply_color_texture_with_scalars(mesh, scalars, cmap)
+                rho, alpha, h = mesh.points[:, 0], mesh.points[:, 1], mesh.points[:, 2]
+            self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h, plotter)
+        #else:
+            #self.apply_color_texture_with_scalars(mesh, scalars, cmap, plotter)
 
-        self.plotter.add_mesh(mesh, show_edges=False, show_scalar_bar=False)
-        self.set_camera()
-        self.plotter.show(screenshot=screenshot)
+        if wireframe:
+            plotter.add_mesh(mesh, show_edges=True, show_scalar_bar=False, style='wireframe')
+        else:
+            plotter.add_mesh(mesh, show_edges=False, show_scalar_bar=False)
+
+        self.set_camera(plotter)
+        plotter.show(screenshot=screenshot)
         mesh.save(filename)
 
         camera_settings = {
-            "position": self.plotter.camera.position,
-            "focal_point": self.plotter.camera.focal_point,
-            "view_up": self.plotter.camera.view_up
+            "position": plotter.camera.position,
+            "focal_point": plotter.camera.focal_point,
+            "view_up": plotter.camera.view_up
         }
 
+        plotter.close()  # Ensure the plotter is closed after showing the plot
         return camera_settings
 
-    def apply_texture_with_geometry(self, mesh, texture_img, rho, alpha, h):
+    def apply_texture_with_geometry(self, mesh, texture_img, rho, alpha, h, plotter):
         texture = pv.read_texture(texture_img)
         texture_image = texture.to_image()
         width, height = texture_image.dimensions[:2]
@@ -593,9 +620,9 @@ class SingleWindowGridViz:
             texture_array[y, x] = texture_array[y, x] * factor
 
         modified_texture = pv.numpy_to_texture(texture_array)
-        self.plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
+        plotter.add_mesh(mesh, texture=modified_texture, show_edges=False, show_scalar_bar=False)
 
-    def apply_color_texture_with_scalars(self, mesh, scalars, cmap):
+    def apply_color_texture_with_scalars(self, mesh, scalars, cmap, plotter):
         z_range = scalars.max() - scalars.min()
         if z_range == 0:
             z_normalized = np.ones_like(scalars)
@@ -605,26 +632,37 @@ class SingleWindowGridViz:
         colormap = plt.get_cmap(cmap)
         colors = colormap(z_normalized)[:, :3]
         mesh.point_data['colors'] = colors
-        self.plotter.add_mesh(mesh, scalars='colors', rgb=True, show_edges=False, show_scalar_bar=False)
+        plotter.add_mesh(mesh, scalars='colors', rgb=True, show_edges=False, show_scalar_bar=False)
 
     def extract_polar_coordinates(self, points):
         x, y, z = points[:, 0], points[:, 1], points[:, 2]
         rho = np.sqrt(x ** 2 + y ** 2)
         alpha = np.arctan2(y, x)
         return rho, alpha, z
+    
+    def extract_cylindrical_coordinates(self, points):
+        rho, alpha, h = points[:, 0], points[:, 1], points[:, 2]
+        x = rho * np.cos(alpha)
+        y = rho * np.sin(alpha)
+        r = np.sqrt(x**2 + y**2)
+        theta = alpha
+        return r, theta, h
 
-    def set_camera(self):
+    def set_camera(self, plotter):
         camera_position = (10, 10, 10)
         focal_point = (0, 0, 0)
         view_up = (0, 0, 1)
-        self.plotter.camera.position = camera_position
-        self.plotter.camera.focal_point = focal_point
-        self.plotter.camera.view_up = view_up
+        plotter.camera.position = camera_position
+        plotter.camera.focal_point = focal_point
+        plotter.camera.view_up = view_up
+
     def save_camera_info_to_file(self, camera_settings, filename):
         with open(filename, 'w') as file:
             file.write(f"Camera Position: {camera_settings['position']}\n")
             file.write(f"Focal Point: {camera_settings['focal_point']}\n")
             file.write(f"View Up: {camera_settings['view_up']}\n")
+
+
 
 ''' loads a vtk mesh file an visualises in appropriate coordinate system'''
 
@@ -632,19 +670,19 @@ class MeshPlotter:
     def __init__(self):
         self.plotter = pv.Plotter()
 
-    def visualize_cartesian(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None):
+    def visualize_cartesian(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None, wireframe=False):
         mesh = pv.read(mesh_file)
         mesh.points = self.standard_scale(mesh.points)
-        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, coordinate_system='cartesian')
+        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, 'cartesian', wireframe)
         return camera_settings
 
-    def visualize_polar(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None):
+    def visualize_polar(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None, wireframe=False):
         mesh = pv.read(mesh_file)
         mesh.points = self.standard_scale(mesh.points)
-        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, coordinate_system='polar')
+        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, 'polar', wireframe)
         return camera_settings
 
-    def visualize_cylindrical(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None):
+    def visualize_cylindrical(self, mesh_file, texture_img=None, cmap='YlOrRd', screenshot=None, wireframe=False):
         mesh = pv.read(mesh_file)
         rho = mesh.points[:, 0]
         alpha = mesh.points[:, 1]
@@ -653,14 +691,14 @@ class MeshPlotter:
         y = rho * np.sin(alpha)
         mesh.points = np.vstack((x, y, h)).T
         mesh.points = self.standard_scale(mesh.points)
-        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, coordinate_system='cylindrical')
+        camera_settings = self.visualize_mesh(mesh, screenshot, texture_img, cmap, 'cylindrical', wireframe)
         return camera_settings
 
     def standard_scale(self, points):
         scaler = StandardScaler()
         return scaler.fit_transform(points)
 
-    def visualize_mesh(self, mesh, screenshot, texture_img, cmap, coordinate_system):
+    def visualize_mesh(self, mesh, screenshot, texture_img, cmap, coordinate_system, wireframe=False):
         scalars = mesh.points[:, 2]
 
         if texture_img:
@@ -671,8 +709,8 @@ class MeshPlotter:
             self.apply_texture_with_geometry(mesh, texture_img, rho, alpha, h)
         else:
             self.apply_color_texture_with_scalars(mesh, scalars, cmap)
-
-        self.plotter.add_mesh(mesh, show_edges=False, show_scalar_bar=False)
+            self.plotter.add_mesh(mesh, show_edges=False, show_scalar_bar=False, style='wireframe' if wireframe else 'surface')
+        
         self.set_camera()
         self.plotter.show(screenshot=screenshot)
 
@@ -744,61 +782,5 @@ class MeshPlotter:
             file.write(f"Focal Point: {camera_settings['focal_point']}\n")
             file.write(f"View Up: {camera_settings['view_up']}\n")
 
-
-''' Objective function with texture info'''
-def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, b_mesh_deformation, lambda_ortho, lambda_det, texture, pbar):
-    rotation_matrix = params[:9].reshape(3, 3)
-    translation_vector = params[9:12]
-    control_points = params[12:-2].reshape(11, 11, 3)
-    lambda_ortho = params[-2]
-    lambda_det = params[-1]
-    a = 0.00051301747 
-    b = 0.0018595674
-
-    deformed_points = points_3d.b_mesh_deformation(a, b, control_points)
-
-    projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
-    projected_2d_pts = projector.project_points(deformed_points)
-    if projected_2d_pts.shape[0] > points_2d_observed.shape[0]:
-        projected_2d_pts = projected_2d_pts[:points_2d_observed.shape[0], :]
-    elif projected_2d_pts.shape[0] < points_2d_observed.shape[0]:
-        points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
-    points_2d_observed = points_2d_observed.reshape(-1, 2)
-    
-    # Compute light intensity error
-    light_intensity_error = []
-    for pt2d, pt3d in zip(projected_2d_pts, deformed_points):
-        x, y, z = pt3d
-        L = calib_p_model(x, y, z, k, g_t, gamma)
-        if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
-            pixel_intensity = get_pixel_intensity(image[int(pt2d[1]), int(pt2d[0])])
-            light_intensity_error.append(abs(pixel_intensity - L))
-        else:
-            light_intensity_error.append(0)
-
-    # Compute texture intensity error
-    texture_intensity_error = []
-    for pt2d, pt3d in zip(projected_2d_pts, deformed_points):
-        if 0 <= int(pt2d[0]) < texture.width and 0 <= int(pt2d[1]) < texture.height:
-            u = int(pt2d[0] * (texture.width - 1))
-            v = int(pt2d[1] * (texture.height - 1))
-            texture_intensity = texture.point_data.active_scalars[v, u]
-            texture_intensity_error.append(abs(texture_intensity - L))
-        else:
-            texture_intensity_error.append(0)
-    
-    # Compute photometric error as the sum of light intensity error and texture intensity error
-    photometric_error = np.sum(light_intensity_error) + np.sum(texture_intensity_error)
-
-    ortho_constraint = np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3)
-    det_constraint = np.linalg.det(rotation_matrix) - 1
-
-    objective = photometric_error
-    objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2
-    objective += lambda_det * det_constraint**2
-
-    pbar.update(1)
-
-    return objective
 
 

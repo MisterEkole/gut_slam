@@ -54,6 +54,44 @@ def rotation_matrix_to_vector(rotation_matrix):
     rotation_vector, _ = cv2.Rodrigues(rotation_matrix)
     return rotation_vector
 
+def apply_texture_with_geometry(points_3d, texture_img, rho, alpha, h):
+    texture = pv.read_texture(texture_img)
+    texture_image = texture.to_image()
+    width, height = texture_image.dimensions[:2]
+    texture_array = texture_image.point_data.active_scalars.reshape((height, width, -1))
+
+    scalars = points_3d[:, 2]
+    normalized_scalars = (scalars - scalars.min()) / (scalars.max() - scalars.min())
+
+    # Normalize the texture coordinates to be between 0 and 1
+    alpha_range = alpha.max() - alpha.min()
+    h_range = h.max() - h.min()
+
+    if alpha_range == 0:
+        u = np.zeros_like(alpha)
+    else:
+        u = (alpha - alpha.min()) / alpha_range
+
+    if h_range == 0:
+        v = np.zeros_like(h)
+    else:
+        v = (h - h.min()) / h_range
+
+    texture_coords = np.c_[u, v]
+
+    # Adjust texture intensity based on normalized scalars
+    new_points_3d = points_3d.copy()
+    for i, (u, v) in enumerate(texture_coords):
+        x = int(u * (width - 1))
+        y = int(v * (height - 1))
+        x = np.clip(x, 0, width - 1)
+        y = np.clip(y, 0, height - 1)
+        factor = normalized_scalars[i]
+        texture_array[y, x] = texture_array[y, x] * factor
+        new_points_3d[i, :3] = texture_array[y, x, :3]
+
+    return new_points_3d
+
 optimization_errors = []
 
 def objective_function(params, points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, b_mesh_deformation, lambda_ortho, lambda_det, pbar):
@@ -77,8 +115,9 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     points_2d_observed = points_2d_observed.reshape(-1, 2)
     
     reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
+    #deformed_pts=apply_texture_with_geometry(deformed_pts,'./tex/colon_DIFF.png',control_points[:,0,0],control_points[:,0,1],control_points[:,0,2])
     photometric_error = []
-    for pt2d, pt3d in zip(projected_2d_pts, deformed_pts):
+    for pt2d, pt3d in zip(points_2d_observed, deformed_pts):
         x, y, z = pt3d
         L = calib_p_model(x, y, z, k, g_t, gamma)
         if 0 <= int(pt2d[0]) < image.shape[1] and 0 <= int(pt2d[1]) < image.shape[0]:
@@ -130,8 +169,8 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
             initial_params,
             args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, 1, 1,frame_idx, pbar), #1,1 lambda ortho lamda det init
             method='dogbox',
-            max_nfev=50,
-            gtol=1e-8,
+            max_nfev=10,
+            gtol=1e-3,
             tr_solver='lsmr'
         )
     
@@ -151,6 +190,7 @@ def log_errors(errors, frame_idx):
         f.write(f"Frame {frame_idx}\n")
         for idx, error in enumerate(errors):
             f.write(f"Iteration {idx + 1}: Reprojection Error: {error['reprojection_error']:.4f}, Photometric Error: {error['photometric_error']:.4f}\n")
+            
         mean_reprojection_error = np.mean([error['reprojection_error'] for error in errors])
         mean_photometric_error = np.mean([error['photometric_error'] for error in errors])
         f.write(f"Mean Reprojection Error: {mean_reprojection_error:.4f}\n")
@@ -185,6 +225,7 @@ def log_optim_params(optimized_params, frame_idx):
 
 def main():
     image_path = '/Users/ekole/Dev/gut_slam/pose_estim/rendering/cartesian_mesh.png'
+    #image_path='/Users/ekole/Blender_Models/Frames_Human_Colon/Frames_S2000/0750.png'
     print("Optimization started...")
     start_time = time.time()
 

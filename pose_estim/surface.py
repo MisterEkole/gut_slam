@@ -16,7 +16,7 @@ import pyvista as pv
 from sklearn.preprocessing import StandardScaler
 import open3d as o3d
 import matplotlib.pyplot as plt
-from utils import generate_uniform_grid_control_points, GridViz, SingleWindowGridViz, BMesh, BMeshDense, BMeshDefDense
+from utils import generate_uniform_grid_control_points, GridViz, SingleWindowGridViz, BMesh, BMeshDense, BMeshDefDense,MeshPlotter
 
 
 
@@ -25,31 +25,41 @@ alpha_step_size = np.pi/4  # Step size for alpha
 radius = 100
 center = (0, 0)
 
-#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size,R=100)
+control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size,R=100)
+#control_points=generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=10)
 # # print(control_points.shape)
-control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
-control_points=control_points.reshape(20,9,3)
+# control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
+# control_points=control_points.reshape(20,9,3)
 #control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=100)
 
 
-bmd = BMeshDense(radius=radius, center=center)
-deformed_points = bmd.b_mesh_deformation(control_points=control_points,subsample_factor=5)
-texture_img = './tex/stomach_DIFF.png'
+bmd = BMeshDefDense(radius=radius, center=center)
+points = bmd.b_mesh_deformation(control_points=control_points,subsample_factor=1,disturbance_amplitude=20.0)
+texture_img = './tex/colon_DIFF.png'
 
 # viz = GridViz(grid_shape=(2, 3))
-viz=SingleWindowGridViz()
+
+# viz.add_mesh_cartesian(points, texture_img=texture_img,subplot=(0, 0))
+# viz.add_mesh_cy(points, texture_img=texture_img,subplot=(0, 1))
+# viz.add_mesh_polar(points, texture_img=texture_img,subplot=(0, 2))
+
+visualizer=SingleWindowGridViz()
+
+camera_settings_cartesian = visualizer.visualize_and_save_cartesian(points, screenshot='./rendering/cart2.png', wireframe=True,filename='./rendering/cartesian_mesh.vtk')
+#print("Cartesian Camera Settings (without wireframe):", camera_settings_cartesian)
+
+# Visualize and save in Cartesian coordinates with wireframe
+camera_settings_cartesian_wireframe = visualizer.visualize_and_save_cylindrical(points, screenshot='./rendering/cy2.png', wireframe=True,filename='./rendering/cylindrical_mesh.vtk')
+#print("Cartesian Camera Settings (with wireframe):", camera_settings_cartesian_wireframe)
+
+# Visualize and save in Polar coordinates without wireframe
+camera_settings_polar = visualizer.visualize_and_save_polar(points, texture_img=None, wireframe=True,screenshot='./rendering/pol2.png', filename='./rendering/polar_mesh.vtk')
+#print("Polar Camera Settings (without wireframe):", camera_settings_polar)
 
 
-# viz.add_mesh_polar(deformed_points, subplot=(0, 0),texture_img=texture_img)
-# viz.add_mesh_cy(deformed_points, subplot=(0, 1),texture_img=texture_img)
-# viz.add_mesh_cartesian(deformed_points,subplot=(0,2),texture_img=texture_img)
-# viz.add_mesh_polar(deformed_points, subplot=(1, 0))
-# viz.add_mesh_cy(deformed_points, subplot=(1, 1))
-# viz.add_mesh_cartesian(deformed_points,subplot=(1,2))
-
-camera_info_cartesian=viz.visualize_and_save_cartesian(deformed_points, './rendering/cartesian_mesh.vtk', screenshot=None,texture_img=texture_img)
-viz.save_camera_info_to_file(camera_info_cartesian, './data/cartesian_camera_info.txt')
+# Add meshes to different subplots
 
 
+# viz.show()
 
-# viz()
+#viz.save_plot(filename='grid_plot.png')
