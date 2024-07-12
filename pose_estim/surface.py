@@ -26,15 +26,14 @@ radius = 100
 center = (0, 0)
 
 control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size,R=100)
-#control_points=generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=10)
-# # print(control_points.shape)
-# control_points=np.loadtxt('/Users/ekole/Dev/gut_slam/pose_estim/logs/optimized_control_points_frame_0.txt')
-# control_points=control_points.reshape(20,9,3)
-#control_points = generate_uniform_grid_control_points(rho_step_size, alpha_step_size, h_constant=100)
+
 
 
 bmd = BMeshDefDense(radius=radius, center=center)
-points = bmd.b_mesh_deformation(control_points=control_points,subsample_factor=1,disturbance_amplitude=20.0)
+points = bmd.b_mesh_deformation(control_points=control_points,subsample_factor=10,bend_amplitude=2.0,bend_frequency=0.001)
+# bmd= BMeshDense(radius=radius, center=center)
+# points=bmd.b_mesh_deformation(control_points=control_points,subsample_factor=10)
+
 texture_img = './tex/colon_DIFF.png'
 
 # viz = GridViz(grid_shape=(2, 3))
@@ -45,15 +44,15 @@ texture_img = './tex/colon_DIFF.png'
 
 visualizer=SingleWindowGridViz()
 
-camera_settings_cartesian = visualizer.visualize_and_save_cartesian(points, screenshot='./rendering/cart2.png', wireframe=True,filename='./rendering/cartesian_mesh.vtk')
+camera_settings_cartesian = visualizer.visualize_and_save_cartesian(points, screenshot=None, wireframe=True,filename='./rendering/cartesian_mesh10.vtk')
 #print("Cartesian Camera Settings (without wireframe):", camera_settings_cartesian)
 
 # Visualize and save in Cartesian coordinates with wireframe
-camera_settings_cartesian_wireframe = visualizer.visualize_and_save_cylindrical(points, screenshot='./rendering/cy2.png', wireframe=True,filename='./rendering/cylindrical_mesh.vtk')
+camera_settings_cartesian_wireframe = visualizer.visualize_and_save_cylindrical(points, screenshot=None, wireframe=True,filename='./rendering/cylindrical_mesh10.vtk')
 #print("Cartesian Camera Settings (with wireframe):", camera_settings_cartesian_wireframe)
 
 # Visualize and save in Polar coordinates without wireframe
-camera_settings_polar = visualizer.visualize_and_save_polar(points, texture_img=None, wireframe=True,screenshot='./rendering/pol2.png', filename='./rendering/polar_mesh.vtk')
+camera_settings_polar = visualizer.visualize_and_save_polar(points, texture_img=None, wireframe=True,screenshot=None, filename='./rendering/polar_mesh10.vtk')
 #print("Polar Camera Settings (without wireframe):", camera_settings_polar)
 
 

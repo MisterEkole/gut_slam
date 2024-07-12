@@ -103,8 +103,12 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     image_height, image_width = image.shape[:2]
     center=(image_width/2,image_height/2,0)
 
-    points_3d=BMeshDense(radius=50,center=center)
-    deformed_pts=points_3d.b_mesh_deformation(control_points,subsample_factor=5)
+    # points_3d=BMeshDense(radius=50,center=center)
+    # deformed_pts=points_3d.b_mesh_deformation(control_points,subsample_factor=10)
+
+    #use this deformation method for image from blender model with deformation
+    points_3d=BMeshDefDense(radius=100,center=center)
+    deformed_pts=points_3d.b_mesh_deformation(control_points,subsample_factor=10, bend_amplitude=15, bend_frequency=3.0)
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     projected_2d_pts = projector.project_points(deformed_pts)
@@ -114,7 +118,7 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
         points_2d_observed = points_2d_observed[:projected_2d_pts.shape[0], :]
     points_2d_observed = points_2d_observed.reshape(-1, 2)
     
-    reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
+    #reprojection_error = np.linalg.norm(projected_2d_pts - points_2d_observed, axis=1)
     #deformed_pts=apply_texture_with_geometry(deformed_pts,'./tex/colon_DIFF.png',control_points[:,0,0],control_points[:,0,1],control_points[:,0,2])
     photometric_error = []
     for pt2d, pt3d in zip(points_2d_observed, deformed_pts):
@@ -129,13 +133,15 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
 
     photometric_error = np.array(photometric_error, dtype=float)
     
-    reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
-    photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
+    #reprojection_error /= (np.linalg.norm(reprojection_error) + 1e-8)
+    #photometric_error /= (np.linalg.norm(photometric_error) + 1e-8)
+    photometric_error = np.array(photometric_error, dtype=float)
+    photometric_error/=1e9
 
     global optimization_errors
     optimization_errors.append(
         {
-            'reprojection_error': np.mean(reprojection_error),
+            #'reprojection_error': np.mean(reprojection_error),
             'photometric_error': np.mean(photometric_error),
         }
     )
@@ -143,7 +149,8 @@ def objective_function(params, points_3d, points_2d_observed, image, intrinsic_m
     ortho_constraint = np.dot(rotation_matrix, rotation_matrix.T) - np.eye(3)
     det_constraint = np.linalg.det(rotation_matrix) - 1
 
-    objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
+    #objective = np.sum(reprojection_error**2) + np.sum(photometric_error**2)
+    objective=np.sum(photometric_error**2)
     objective += lambda_ortho * np.linalg.norm(ortho_constraint, 'fro')**2
     objective += lambda_det * det_constraint**2
 
@@ -169,9 +176,9 @@ def optimize_params(points_3d, points_2d_observed, image, intrinsic_matrix, init
             initial_params,
             args=(points_3d, points_2d_observed, image, intrinsic_matrix, k, g_t, gamma, 1, 1,frame_idx, pbar), #1,1 lambda ortho lamda det init
             method='dogbox',
-            max_nfev=10,
+            max_nfev=5000,
             gtol=1e-3,
-            tr_solver='lsmr'
+            tr_solver='lsmr',
         )
     
     log_errors(optimization_errors, frame_idx)
@@ -184,16 +191,17 @@ def log_errors(errors, frame_idx):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
     
-    file_path = os.path.join(folder_path, 'optimization_errors_all_frames.txt')
+    file_path = os.path.join(folder_path, 'optimization_errors_all_frames4.txt')
    
     with open(file_path, 'a') as f:
         f.write(f"Frame {frame_idx}\n")
         for idx, error in enumerate(errors):
-            f.write(f"Iteration {idx + 1}: Reprojection Error: {error['reprojection_error']:.4f}, Photometric Error: {error['photometric_error']:.4f}\n")
+            #f.write(f"Iteration {idx + 1}: Reprojection Error: {error['reprojection_error']:.4f}, Photometric Error: {error['photometric_error']:.4f}\n")
+            f.write(f"Iteration {idx + 1}: Photometric Error: {error['photometric_error']:.4f}\n")
             
-        mean_reprojection_error = np.mean([error['reprojection_error'] for error in errors])
+        #mean_reprojection_error = np.mean([error['reprojection_error'] for error in errors])
         mean_photometric_error = np.mean([error['photometric_error'] for error in errors])
-        f.write(f"Mean Reprojection Error: {mean_reprojection_error:.4f}\n")
+        #f.write(f"Mean Reprojection Error: {mean_reprojection_error:.4f}\n")
         f.write(f"Mean Photometric Error: {mean_photometric_error:.4f}\n\n")
 
 def process_frame(image, intrinsic_matrix, initial_params, points_3d, k, g_t, gamma, b_mesh_deformation, frame_idx):
@@ -211,7 +219,7 @@ def log_optim_params(optimized_params, frame_idx):
     folder_path = './logs'
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
-    file_path = os.path.join(folder_path, 'optimized_params_all_frames.txt')
+    file_path = os.path.join(folder_path, 'optimized_params_all_frames4.txt')
     
     with open(file_path, 'a') as f:
         f.write(f"Frame {frame_idx}\n")
@@ -224,8 +232,8 @@ def log_optim_params(optimized_params, frame_idx):
     np.savetxt(control_points_file, optimized_params[12:-2].reshape(-1, 3))
 
 def main():
-    image_path = '/Users/ekole/Dev/gut_slam/pose_estim/rendering/cartesian_mesh.png'
-    #image_path='/Users/ekole/Blender_Models/Frames_Human_Colon/Frames_S2000/0750.png'
+    #image_path = '/Users/ekole/Dev/gut_slam/pose_estim/rendering/cartesian_mesh_ground_truth.png'  #sythnetic image
+    image_path='/Users/ekole/Blender_Models/Frames_Human_Colon/Frames_S2000/0750.png'              #image from blender model
     print("Optimization started...")
     start_time = time.time()
 
@@ -249,26 +257,41 @@ def main():
 
     points_2d_observed=detect_feature_points(image)
     
-    z_vector = np.array([0, 0, 10])
-    z_unit_vector = z_vector / np.linalg.norm(z_vector)
-    x_camera_vector = np.array([1, 0, 0])
-    y_vector = np.cross(z_unit_vector, x_camera_vector)
-    x_vector = (np.cross(z_unit_vector, y_vector))
-    x_vector /= np.linalg.norm(x_vector)
-    y_vector /= np.linalg.norm(y_vector)
-    rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
-    #rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))
+    # z_vector = np.array([0, 0, 10])
+    # z_unit_vector = z_vector / np.linalg.norm(z_vector)
+    # x_camera_vector = np.array([1, 0, 0])
+    # y_vector = np.cross(z_unit_vector, x_camera_vector)
+    # x_vector = (np.cross(z_unit_vector, y_vector))
+    # x_vector /= np.linalg.norm(x_vector)
+    # y_vector /= np.linalg.norm(y_vector)
+    # rot_mat = np.vstack([x_vector, y_vector, z_unit_vector]).T
+    
+    # cam pose from sythetic image
+    # rot_mat=np.array(euler_to_rot_mat(-0.25385209918022200,-3.141592502593990,0.15033599734306300))
    
-    trans_mat = np.array([-0.05033538430028072, -0.07541576289068641, 2.572986058541503])
+    # trans_mat = np.array([-0.05033538430028072, -0.07541576289068641, 2.572986058541503])
+
+
+    #cam pose from blender model image
+    rot_mat=np.array(euler_to_rot_mat(-0.231162846088409,3.14159250259399,0.0594624541699886))
+   
+    trans_mat = np.array([0.0729269981384277, 2.93954586982727, 5.5793571472168])
 
     intrinsic_matrix, rotation_matrix, translation_vector = Project3D_2D_cam.get_camera_parameters(image_height, image_width, rot_mat, trans_mat,center)
     k = 2.5
     g_t = 2.0
     gamma = 2.2
-    init_lambda_ortho = 1
-    init_lambda_det = 1
-    points_3d=BMeshDense(radius,center)
-    points_3d=points_3d.b_mesh_deformation(control_points,subsample_factor=5)
+    init_lambda_ortho = 1.0
+    init_lambda_det = 1.0
+
+    #use this deformation method for image from BMesh model with no deformation--- ground truth data
+    # points_3d=BMeshDense(radius,center)
+    # points_3d=points_3d.b_mesh_deformation(control_points,subsample_factor=10)
+
+
+    #use this deformation method for image from blender model with deformation
+    points_3d=BMeshDefDense(radius,center)
+    points_3d=points_3d.b_mesh_deformation(control_points,subsample_factor=10, bend_amplitude=15, bend_frequency=3.0)
     
 
     initial_params = np.hstack([rotation_matrix.flatten(), translation_vector.flatten(),control_points.ravel(),init_lambda_ortho, init_lambda_det])

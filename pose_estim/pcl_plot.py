@@ -1,8 +1,10 @@
-import open3d as o3d
-import pyvista as pv
 import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from utils import BMeshDense, BMeshDefDense
 
 def read_vtk_mesh(file_path):
+    import pyvista as pv  
     mesh = pv.read(file_path)
     return mesh
 
@@ -10,53 +12,77 @@ def vtk_to_point_cloud(mesh):
     points = np.asarray(mesh.points)
     return points
 
-def densify_points(points, factor=2):
+def polar_to_cartesian(rho, alpha, h):
+    x = rho * np.cos(alpha)
+    y = rho * np.sin(alpha)
+    z = h
+    return x, y, z
+
+def convert_to_cartesian(points):
     """
-    Densify the points by adding new points between existing points.
-    The factor determines the number of points added between each pair of original points.
+    Convert points from polar to Cartesian coordinates.
+    Assumes points are in the form [rho, alpha, h].
     """
-    new_points = []
-    num_points = len(points)
-    for i in range(num_points):
-        for j in range(i + 1, num_points):
-            line_points = np.linspace(points[i], points[j], factor + 2)
-            new_points.extend(line_points)
-    return np.array(new_points)
+    cartesian_points = np.array([polar_to_cartesian(p[0], p[1], p[2]) for p in points])
+    return cartesian_points
 
-def save_point_cloud_as_image(pcd, image_path, vis):
-    # Capture and save the current screen image
-    vis.capture_screen_image(image_path)
+def plot_cartesian_point_cloud(points, dpi=300):
+    fig = plt.figure(dpi=dpi)
+    
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o', s=1, label='Reconstructed Point Cloud')
+    
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
+    ax.legend()
 
-def main(file_path, densify_factor=2, image_path="point_cloud_image.png"):
-    # Read the VTK mesh
-    mesh = read_vtk_mesh(file_path)
+    plt.show()
 
-    # Convert VTK mesh to point cloud
-    points = vtk_to_point_cloud(mesh)
+def plot_cartesian_point_cloud_gt(points, dpi=300):
+    fig = plt.figure(dpi=dpi)
+    
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='y', marker='o', s=1, label='Ground Truth Point Cloud')
+    
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
+    ax.legend()
 
-    # Densify the points
-    densified_points = densify_points(points, densify_factor)
+    plt.show()
 
-    # Create Open3D point cloud
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(densified_points)
+def plot_polar_point_cloud(points, dpi=300):
+    fig = plt.figure(dpi=dpi)
+    
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='b', marker='^', s=1, label='Reconstructed Point Cloud')
+    
+    ax.set_xlabel('Rho')
+    ax.set_ylabel('Alpha')
+    ax.set_zlabel('H')
+    ax.legend()
 
-    # Create visualizer and add point cloud
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(pcd)
+    plt.show()
 
-    # Run the visualizer
-    vis.run()
+def main(cartesian_file_path, polar_file_path, densify_factor=2, dpi=300):
+    # Load Cartesian mesh
+    cartesian_mesh = read_vtk_mesh(cartesian_file_path)
+    cartesian_points = vtk_to_point_cloud(cartesian_mesh)
+    
+    # Load polar mesh
+    polar_mesh = read_vtk_mesh(polar_file_path)
+    polar_points = vtk_to_point_cloud(polar_mesh)
 
-    # Save the point cloud as an image
-    save_point_cloud_as_image(pcd, image_path, vis)
 
-    # Destroy the visualizer window
-    vis.destroy_window()
+    # Plot both point clouds in separate figures
+    plot_cartesian_point_cloud(cartesian_points, dpi)
+    plot_cartesian_point_cloud_gt(cartesian_points, dpi)
+    plot_polar_point_cloud(polar_points, dpi)
 
 if __name__ == "__main__":
-    file_path = "./rendering/cylindrical_mesh.vtk"  # Replace with the path to your VTK file
-    densify_factor = 1  # Adjust the densification factor as needed
-    image_path = "point_cloud_image.png"  # Path to save the point cloud image
-    main(file_path, densify_factor, image_path)
+    cartesian_file_path = "./rendering/cartesian_mesh9.vtk"
+    polar_file_path = "./rendering/polar_mesh9.vtk"
+    densify_factor = 1
+    dpi = 150
+    main(cartesian_file_path, polar_file_path, densify_factor, dpi)

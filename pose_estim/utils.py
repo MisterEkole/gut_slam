@@ -359,8 +359,8 @@ class BMeshDefDense:
                         pts.append([new_rho, new_alpha, new_h])
 
         pts = np.array(pts)
-        #pts=self.bend_deformation(pts, bend_amplitude, bend_frequency)
-        pts=self.apply_random_disturbances(pts,disturbance_amplitude=4.0)
+        pts=self.bend_deformation(pts, bend_amplitude, bend_frequency)
+        #pts=self.apply_random_disturbances(pts,disturbance_amplitude=1.0)
         #pts=self.apply_sinusoidal_disturbances(pts, amplitude=10.0, frequency=2.0)
         #pts=self.twist_deformation(pts,twist_rate=1.0)
 
@@ -519,8 +519,15 @@ class SingleWindowGridViz:
         h = points[:, 2]
         x, y, z = polar_to_cartesian(rho, alpha, h)
         points = np.vstack((x, y, z)).T
-        points = self.standard_scale(points)
-        mesh = self.create_structured_grid(points)
+        scaler = StandardScaler()
+        points = scaler.fit_transform(points)
+        nx = int(np.sqrt(points.shape[0]))
+        ny = nx
+        grid = pv.StructuredGrid()
+        grid.points = points
+        grid.dimensions = (nx, ny, 1)
+        mesh=grid
+        
         camera_settings = self.visualize_mesh(mesh, filename, screenshot, texture_img, 'cartesian', wireframe)
         return camera_settings
 
@@ -548,13 +555,6 @@ class SingleWindowGridViz:
         scaler = StandardScaler()
         return scaler.fit_transform(points)
 
-    def create_structured_grid(self, points):
-        nx = int(np.sqrt(points.shape[0]))
-        ny = nx
-        grid = pv.StructuredGrid()
-        grid.points = points
-        grid.dimensions = (nx, ny, 1)
-        return grid
 
     def create_delaunay_mesh(self, points):
         cloud = pv.PolyData(points)

@@ -238,7 +238,7 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    mesh_pts, mesh_edges=read_vtk_file('./rendering/cartesian_mesh.vtk')
+    mesh_pts, mesh_edges=read_vtk_file('./rendering/cartesian_mesh9.vtk')
 
     projected_pts=projector.project_points(points_3d=mesh_pts)
     projected_pts=scale_projected_points(projected_pts, image_width, image_height)
