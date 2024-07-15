@@ -39,14 +39,43 @@ def scale_projected_points(projected_pts, image_width, image_height):
 
     return projected_pts
 
+# def read_vtk_file(vtk_file):
+#     mesh = pv.read(vtk_file)
+#     points = mesh.points
+#     if mesh.faces.size > 0:
+#         faces = mesh.faces.reshape(-1, 4)[:, 1:]  # Reshape and skip the first column if using VTK POLYDATA with 'vtkCellArray' format
+#     else:
+#         faces = np.array([])  # Handle the case where no faces data is present
+#     return points, faces
+
 def read_vtk_file(vtk_file):
     mesh = pv.read(vtk_file)
     points = mesh.points
-    if mesh.faces.size > 0:
-        faces = mesh.faces.reshape(-1, 4)[:, 1:]  # Reshape and skip the first column if using VTK POLYDATA with 'vtkCellArray' format
+
+    if isinstance(mesh, pv.StructuredGrid):
+        # For structured grid, we create faces (edges) manually
+        dimensions = mesh.dimensions
+        faces = []
+        for i in range(dimensions[0] - 1):
+            for j in range(dimensions[1] - 1):
+                p1 = i * dimensions[1] + j
+                p2 = p1 + 1
+                p3 = p1 + dimensions[1]
+                p4 = p3 + 1
+                faces.append([p1, p2, p4, p3])
+        faces = np.array(faces)
     else:
-        faces = np.array([])  # Handle the case where no faces data is present
+        if mesh.faces.size > 0:
+            faces = mesh.faces.reshape(-1, 4)[:, 1:]
+        else:
+            faces = np.array([])
+
     return points, faces
+
+
+
+
+
 
 
 def plot_mesh_wireframe_on_image_cmap(image, points_2d, points_3d, faces):
@@ -120,7 +149,7 @@ def plot_mesh_wireframe_on_image(image, points_2d, faces, num_divisions=5):
             end_idx = face[(i + 1) % len(face)]  # Connect vertices cyclically
             edge_points = np.array([points_2d[start_idx], points_2d[end_idx]])
             #densified_edge_points = densify_points(edge_points, num_divisions=num_divisions)
-            plt.plot(edge_points[:, 0], edge_points[:, 1], color='red')
+            plt.plot(edge_points[:, 0], edge_points[:, 1], color='green', linewidth=1)
     
     plt.axis('off')  
     plt.title("3D Mesh Wireframe on 2D Image")
@@ -209,15 +238,15 @@ def main():
 
     projector = Project3D_2D_cam(intrinsic_matrix, rotation_matrix, translation_vector)
     
-    #mesh_pts, mesh_edges=read_vtk_file('./rendering/cartesian_mesh.vtk')
+    mesh_pts, mesh_edges=read_vtk_file('./rendering/cartesian_mesh9.vtk')
 
-    # projected_pts=projector.project_points(points_3d=mesh_pts)
-    # projected_pts=scale_projected_points(projected_pts, image_width, image_height)
+    projected_pts=projector.project_points(points_3d=mesh_pts)
+    projected_pts=scale_projected_points(projected_pts, image_width, image_height)
   
-    # plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
-    # plot_on_image(image_path, projected_pts)
+    plot_mesh_wireframe_on_image(image, projected_pts, mesh_edges)
+    plot_on_image(image_path, projected_pts)
     #load_and_plot_mesh('./rendering/textured_gut_mesh.ply')
-    m_plotter.visualize_cartesian('./rendering/def_mesh.vtk', texture_img)
+    #m_plotter.visualize_cartesian('./rendering/def_mesh.vtk', texture_img)
     
 if __name__ == "__main__":
     main()
