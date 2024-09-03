@@ -12,13 +12,7 @@ This repository contains the code and resources for the GutSLAM project, which f
 - Pyvista
 - Matplotlib
 
-<!-- eraser-additional-content -->
-## Project Architecture-Workflow
-<!-- eraser-additional-files -->
-<a href="/README-Project Workflow-1.eraserdiagram" data-element-id="rqRQfe4xZ9uwBx9FAw-if"><img src="/.eraser/m4vfOuvxwAZvp35jmydA___8QpfK1JLq0ZBFf9iXkdFQSwJAXI2___---diagram----61e4a6b63ef5d4daf26bf965b00ca3ae-Project-Workflow.png" alt="" data-element-id="rqRQfe4xZ9uwBx9FAw-if" /></a>
-<!-- end-eraser-additional-files -->
-<!-- end-eraser-additional-content -->
-<!--- Eraser file: https://app.eraser.io/workspace/m4vfOuvxwAZvp35jmydA --->
+
 
 
 ### **/ttp_nrsfm**
@@ -48,7 +42,7 @@ Scripts related to photometric reconstruction components of the project.
 - `reconstruct.py` , `calib.py` , `visualize.py` : Utilities for reconstruction, calibration, and visualization.
 - `/pcl_output` : Output text files of point cloud data.
 - `/image_output` : Output images such as depth maps.
-## Quick Start
+
 
 
 
